@@ -950,22 +950,42 @@ body.is-resizing {
 
 /* ============================== 提交历史 ============================== */
 
-.commit-scroll {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0;
-}
-
 .commit-inner {
   position: relative;
 }
 
+.commit-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 画布固定为视口大小，随滚动重绘（不受 canvas 32767px 高度上限限制） */
 .commit-canvas {
   position: absolute;
   top: 0;
   left: 0;
   pointer-events: none;
+  z-index: 0;
+}
+
+.commit-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 1;
+}
+
+.commit-more {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .commit-row {

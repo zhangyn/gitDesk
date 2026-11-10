@@ -53,15 +53,17 @@ export function laneStats(rows: GraphRow[]): { lanes: number; step: number } {
   return { lanes: laneCount(rows), step: laneStepFor(rows) };
 }
 
-/**
- * 把提交图绘制到一张「整表高度」的 canvas 上。
- * canvas 位于文本行之下（z-index 更低），行本身背景透明，因此不需要虚拟滚动也能
- * 在 400 行级别保持 60fps。超过 2000 行时再切分片/虚拟化。
- */
 function laneSpan(rows: GraphRow[]): number {
   return laneCount(rows);
 }
 
+/**
+ * 只绘制**视口内**的提交行。
+ *
+ * 为什么必须这样：canvas 的位图高度在 Chromium 上有 32767px 的硬上限，
+ * 26px 一行到 1200 多行就画不出来了。改成画布固定为视口大小、按 scrollTop 偏移绘制，
+ * 行数就没有上限（几万行的仓库也能滚）。
+ */
 export function drawGraph(
   canvas: HTMLCanvasElement,
   rows: GraphRow[],
@@ -70,18 +72,21 @@ export function drawGraph(
     width: number;
     /** 泳道图区宽度（文本从它右边开始） */
     graphWidth: number;
-    height: number;
+    /** 视口高度（画布高度） */
+    viewportHeight: number;
+    /** 当前滚动位置 */
+    scrollTop: number;
     selectedIndex: number;
     hoverIndex: number;
   },
 ): void {
   const dpr = window.devicePixelRatio || 1;
-  const { width, graphWidth, height } = opts;
+  const { width, graphWidth, viewportHeight, scrollTop } = opts;
 
   canvas.width = Math.max(1, Math.floor(width * dpr));
-  canvas.height = Math.max(1, Math.floor(height * dpr));
+  canvas.height = Math.max(1, Math.floor(viewportHeight * dpr));
   canvas.style.width = `${width}px`;
-  canvas.style.height = `${height}px`;
+  canvas.style.height = `${viewportHeight}px`;
 
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -90,7 +95,7 @@ export function drawGraph(
     getComputedStyle(document.documentElement).getPropertyValue('--node-ring').trim() || '#0d1117';
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, width, height);
+  ctx.clearRect(0, 0, width, viewportHeight);
 
   const span = Math.min(MAX_DRAWN_LANES, laneSpan(rows));
   const step = Math.max(
@@ -103,9 +108,16 @@ export function drawGraph(
   const nodeR = Math.max(1.15, Math.min(3.6, step * 0.42));
   ctx.lineWidth = Math.max(0.9, Math.min(1.6, step * 0.22));
 
-  for (let i = 0; i < rows.length; i++) {
+  // 上下各多画一行，滚动时边缘不闪
+  const firstRow = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 1);
+  const lastRow = Math.min(
+    rows.length,
+    Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + 1,
+  );
+
+  for (let i = firstRow; i < lastRow; i++) {
     const r = rows[i];
-    const yTop = i * ROW_HEIGHT;
+    const yTop = i * ROW_HEIGHT - scrollTop;
     const yMid = yTop + ROW_HEIGHT / 2;
     const yBot = yTop + ROW_HEIGHT;
 

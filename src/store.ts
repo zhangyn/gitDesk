@@ -101,7 +101,8 @@ import { confirmBox } from './ui/dialog';
 import { applyTheme, loadTheme, syncWindowTheme, watchSystemTheme } from './ui/theme';
 
 const RECENT_KEY = 'gitdesk.recent';
-const LOG_LIMIT = 400;
+/** 每页加载多少条提交；点「加载更多」就再加一页 */
+const LOG_PAGE = 400;
 const MAX_RECENT = 24;
 
 export interface DiffTarget {
@@ -218,6 +219,9 @@ interface AppStore {
   /** 提交历史搜索（null = 不过滤） */
   logQuery: LogSearch | null;
   logSearching: boolean;
+  /** 当前加载深度（每次「加载更多」+LOG_PAGE） */
+  logLimit: number;
+  loadMoreLog: () => Promise<void>;
   setLogQuery: (mode: 'message' | 'path', text: string) => void;
   clearLogQuery: () => void;
   /** 对比视图的元信息 */
@@ -333,6 +337,7 @@ const EMPTY_REPO_STATE = {
   logScope: 'local' as LogScope,
   logQuery: null,
   logSearching: false,
+  logLimit: LOG_PAGE,
   compareInfo: null,
   stagedStat: null,
   commitTabs: [] as CommitTab[],
@@ -670,8 +675,8 @@ export const useStore = create<AppStore>()((set, get) => {
           await Promise.all([
             getStatus(repo.path),
             search && search.text.trim()
-              ? searchLog(repo.path, LOG_LIMIT, search, get().logScope)
-              : getLog(repo.path, LOG_LIMIT, get().logScope),
+              ? searchLog(repo.path, get().logLimit, search, get().logScope)
+              : getLog(repo.path, get().logLimit, get().logScope),
             getRefs(repo.path),
             listStashes(repo.path),
             listBackups(repo.path),
@@ -764,13 +769,24 @@ export const useStore = create<AppStore>()((set, get) => {
     },
 
     setLogQuery(mode, text) {
-      set({ logQuery: text.trim() ? { mode, text } : null, logSearching: Boolean(text.trim()) });
+      // 换搜索条件就回到第一页
+      set({
+        logQuery: text.trim() ? { mode, text } : null,
+        logSearching: Boolean(text.trim()),
+        logLimit: LOG_PAGE,
+      });
       void get().refresh();
     },
 
     clearLogQuery() {
-      set({ logQuery: null, logSearching: false });
+      set({ logQuery: null, logSearching: false, logLimit: LOG_PAGE });
       void get().refresh();
+    },
+
+    /** 加载下一页：加大深度后整段重取（几千行的解析是毫秒级，比增量拼接更不容易错） */
+    async loadMoreLog() {
+      set({ logLimit: get().logLimit + LOG_PAGE });
+      await get().refresh();
     },
 
     async openCommit(sha) {
