@@ -15,26 +15,26 @@
   --add-bg: rgba(126, 231, 135, 0.11);
   --del-bg: rgba(248, 81, 73, 0.11);
   /* 交互/辅助色（为浅色主题准备的语义变量） */
-  --hover-1: var(--hover-1);
-  --hover-2: var(--hover-2);
-  --sel: var(--sel);
-  --sel-strong: rgba(88, 166, 255, 0.2);
-  --border-strong: var(--border-strong);
-  --btn-hover: var(--btn-hover);
-  --dim-1: var(--dim-1);
-  --dim-2: var(--dim-2);
-  --dim-3: var(--dim-3);
-  --scroll: var(--scroll);
-  --scroll-hover: var(--scroll-hover);
-  --overlay: var(--overlay);
-  --primary: var(--primary);
-  --primary-hover: var(--primary-hover);
-  --hunk-fg: var(--hunk-fg);
-  --violet: var(--violet);
-  --ok: var(--ok);
-  --err-bg: var(--err-bg);
-  --err-border: var(--err-border);
-  --err-fg: var(--err-fg);
+  --hover-1: rgba(255, 255, 255, 0.04);
+  --hover-2: rgba(255, 255, 255, 0.08);
+  --sel: rgba(88, 166, 255, 0.20);
+  --sel-strong: rgba(88, 166, 255, 0.3);
+  --border-strong: #33415a;
+  --btn-hover: #232b3a;
+  --dim-1: #5b6674;
+  --dim-2: #4f5c6d;
+  --dim-3: #3f4a57;
+  --scroll: #2b3341;
+  --scroll-hover: #3b4657;
+  --overlay: rgba(1, 4, 9, 0.62);
+  --primary: #1f6feb;
+  --primary-hover: #2a7bef;
+  --hunk-fg: #79c0ff;
+  --violet: #d2a8ff;
+  --ok: #3fb950;
+  --err-bg: #2b1618;
+  --err-border: #5a2a2e;
+  --err-fg: #ffb3ae;
   --node-ring: #0d1117;
   --fg-strong: #ffffff;
 
@@ -655,6 +655,22 @@ body.is-resizing {
 
 .chg-row.is-active {
   background: var(--sel);
+  /* 左侧强调条：只看底色在深色下还是容易糊，加一条 2px 的竖线最直观 */
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.chg-row.is-active .chg-base {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.chg-row.is-active .chg-dir {
+  color: var(--fg-dim);
+}
+
+/* 已选中的行不要再被 hover 底色盖一层 */
+.chg-row.is-active:hover .chg-main {
+  background: transparent;
 }
 
 .chg-row.is-conflict .chg-base {
@@ -2583,7 +2599,7 @@ body.is-resizing-x {
 
   --hover-1: rgba(16, 22, 30, 0.045);
   --hover-2: rgba(16, 22, 30, 0.085);
-  --sel: rgba(9, 105, 218, 0.1);
+  --sel: rgba(9, 105, 218, 0.13);
   --sel-strong: rgba(9, 105, 218, 0.17);
   --border-strong: #b6c0cc;
   --btn-hover: #e2e7ee;
@@ -2916,4 +2932,17 @@ body.is-resizing-x {
 :root[data-theme='light'] .dl.del .wd,
 :root[data-theme='light'] .dsp-cell.del .wd {
   background: rgba(207, 34, 46, 0.2);
+}
+
+/* 状态格：两列宽度恒定，空格子给一个淡点，避免暂存/取消暂存时文件名左右跳 */
+.chip-empty {
+  color: var(--dim-3);
+  font-size: 11px;
+}
+
+.chips-legend {
+  color: var(--dim-2);
+  font-size: 10.5px;
+  font-weight: 400;
+  white-space: nowrap;
 }

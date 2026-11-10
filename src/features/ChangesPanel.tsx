@@ -15,8 +15,20 @@ function toneOf(letter: string, entry: StatusEntry): Tone {
 }
 
 function Chip({ letter, tone }: { letter: string; tone: Tone }) {
-  if (letter === '.' || letter === ' ') return <span className="chip chip-empty" />;
+  // 空格子也画一个淡点：两列宽度恒定，暂存/取消暂存时文件名不会左右跳
+  if (letter === '.' || letter === ' ') return <span className="chip chip-empty">·</span>;
   return <span className={`chip chip-${tone}`}>{letter}</span>;
+}
+
+/** 一行中文说明，用于行 tooltip（"怎么区分暂存 / 未暂存"最直接的答案） */
+function describeEntry(entry: StatusEntry): string {
+  if (entry.kind === 'unmerged') return '冲突：需要先解决';
+  if (entry.kind === 'untracked') return '未跟踪：还没有被 git 记录';
+  const staged = hasStaged(entry);
+  const worktree = hasWorktree(entry);
+  if (staged && worktree) return '已暂存，且工作区还有未暂存的改动';
+  if (staged) return '已暂存，工作区无改动';
+  return '未暂存：改动还在工作区';
 }
 
 function splitPath(path: string): { dir: string; base: string } {
@@ -56,22 +68,22 @@ function ChangeRow({ entry }: { entry: StatusEntry }) {
   return (
     <div
       className={`chg-row${active ? ' is-active' : ''}${unmerged ? ' is-conflict' : ''}`}
-      title={`${entry.path}\n单击预览 · 双击放大`}
+      title={`${entry.path}\n${describeEntry(entry)}\n单击预览 · 双击放大`}
       onDoubleClick={async () => {
         await showChange(entry);
         openDiffModal();
       }}
     >
       <button className="chg-main" onClick={() => void showChange(entry)}>
-        <span className="chg-chips">
-          {untracked ? (
-            <Chip letter="?" tone="untracked" />
-          ) : (
-            <>
-              <Chip letter={entry.index} tone={toneOf(entry.index, entry)} />
-              <Chip letter={entry.worktree} tone={toneOf(entry.worktree, entry)} />
-            </>
-          )}
+        <span className="chg-chips" title="左：暂存区状态　右：工作区状态">
+          <Chip
+            letter={untracked ? '.' : entry.index}
+            tone={toneOf(entry.index, entry)}
+          />
+          <Chip
+            letter={untracked ? '?' : entry.worktree}
+            tone={toneOf(entry.worktree, entry)}
+          />
         </span>
         <span className="chg-path">
           {dir && <span className="chg-dir">{dir}</span>}
@@ -136,8 +148,9 @@ function CommitFileRow({ file }: { file: CommitFile }) {
       }}
     >
       <button className="chg-main" onClick={() => void showTabFile(file)}>
-        <span className="chg-chips">
+        <span className="chg-chips" title="该提交对这个文件做了什么">
           <Chip letter={file.status} tone={FILE_TONE[file.status] ?? 'mod'} />
+          <Chip letter="." tone="none" />
         </span>
         <span className="chg-path">
           {dir && <span className="chg-dir">{dir}</span>}
@@ -222,6 +235,9 @@ export function ChangesPanel() {
 
         {isWorktree ? (
           <>
+            <span className="chips-legend" title="每行两个格子：左=暂存区状态，右=工作区状态">
+              左 暂存区 · 右 工作区
+            </span>
             <button
               className="link"
               disabled={busy !== null || total === 0}
