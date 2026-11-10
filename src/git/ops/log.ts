@@ -13,12 +13,49 @@ export type LogScope = 'local' | 'all';
  * scope='local' 只看本地分支 + HEAD —— 有几百个远程分支的仓库用 --all 会让泳道数爆炸，
  * 提交图被压成一条糊线。想看全部远程开发线时再切 'all'。
  */
+export type LogSearchMode = 'message' | 'path';
+
+export interface LogSearch {
+  mode: LogSearchMode;
+  text: string;
+}
+
+/**
+ * 在提交历史里搜索。
+ * - message：`--grep` 固定串 + 忽略大小写，查「某件事是哪次提交做的」
+ * - path：paths 通配，查「这个文件都在哪些提交里被改过」
+ */
+export async function searchLog(
+  repoPath: string,
+  limit: number,
+  search: LogSearch,
+  scope: LogScope = 'local',
+): Promise<Commit[]> {
+  const q = search.text.trim();
+  if (!q) return getLog(repoPath, limit, scope);
+
+  const args = ['log', '--topo-order', '-n', String(limit), `--format=${LOG_FORMAT}`];
+  // 版本范围必须放在 `--` 之前！放后面会被当成路径，搜索范围就退化成只有 HEAD
+  args.push('--branches', '--tags', 'HEAD');
+  if (scope === 'all') args.push('--remotes');
+  if (search.mode === 'message') {
+    args.push('-i', '--fixed-strings', `--grep=${q}`);
+  } else {
+    // 子串匹配，用户输入部分文件名也能命中；代价是不跟重命名（--follow 不支持通配）
+    args.push('--', `*${q}*`);
+  }
+
+  const res = await runGitChecked(args, { cwd: repoPath, timeoutMs: 60_000 });
+  return parseLog(res.stdout);
+}
+
 export async function getLog(
   repoPath: string,
   limit = 400,
   scope: LogScope = 'local',
 ): Promise<Commit[]> {
-  const refs = scope === 'all' ? ['--all'] : ['--branches', 'HEAD'];
+  // --tags：只在标签上可达的提交也要出现在历史里
+  const refs = scope === 'all' ? ['--all'] : ['--branches', '--tags', 'HEAD'];
   const res = await runGitChecked(
     ['log', ...refs, '--topo-order', '-n', String(limit), `--format=${LOG_FORMAT}`],
     { cwd: repoPath, timeoutMs: 30_000 },

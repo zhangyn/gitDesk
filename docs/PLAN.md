@@ -372,6 +372,22 @@ gitdesk/
 
 顺带修掉一个隐蔽 bug：分组用 `useState(defaultOpen)`，而数据是异步来的 —— 首次渲染时 count 还是 0，`defaultOpen` 为 false 就再也打不开（Stash/标签分组会一直空着）。改为 `defaultOpen` 变 true 时自动展开一次。
 
+### 布局 v9：自动刷新 / 对比 / 搜索（按用户需求）
+
+| 需求 | 实现 |
+| --- | --- |
+| IDE 改完不用手动刷 | Rust `notify` 监听工作区 + `.git`，350ms 合并窗口后 emit `repo://changed`；前端 250ms 去抖，`.git` 变化走全量刷新、工作区变化走轻量刷新（只 status+refs） |
+| rebase 冲突后没法继续 | 顶部「进行中」横幅 + 继续 / 跳过 / 中止；`GIT_EDITOR=true` 避免 `rebase --continue` 卡在编辑器 |
+| 分支↔分支对比 | 一套「任意两个 rev」的实现：`git diff --name-status A B` + `--shortstat` + `rev-list --count A..B`，左右可以是分支/标签/sha/`HEAD~3` |
+| 提交 A↔提交 B 对比（中间多次提交） | 同上——`git diff` 与 DAG 关系无关，B 不是 A 的子孙也能对比，标题里额外显示「中间 N 个提交」 |
+| 在历史里搜说明 / 搜文件 | `--grep` 固定串 + `-i`；文件模式用 paths 通配 `*关键词*`（代价：不跟重命名，`--follow` 不支持通配） |
+
+测试当场抓到三个 bug（都是"看着对、实际没生效"那类）：
+
+1. `--no-optional-locks` 放错位置 → `git status` 直接失败，UI 显示 0 个变更
+2. 搜索的 `--branches` 放在 `--` 之后 → 被当成路径，搜索范围退化成只有 HEAD（已加回归断言：只在未合并分支上的文件也必须能搜到）
+3. 监听的忽略规则里有 `/.tmp/`，而仓库本身在 `.../.tmp/demo` → **所有事件被误杀**，表现为"监听成功但永远收不到"。改为相对监听根目录判断
+
 ### 与初版方案的偏离（有意为之）
 
 | 方案原定 | 实际 | 原因 |

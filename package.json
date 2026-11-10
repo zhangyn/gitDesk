@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "icons": "node scripts/gen-icons.mjs",
-    "verify": "esbuild scripts/verify-parsers.ts --bundle --platform=node --format=esm --outfile=.tmp/verify-parsers.mjs --log-level=warning && esbuild scripts/verify-staging.ts --bundle --platform=node --format=esm --outfile=.tmp/verify-staging.mjs --log-level=warning && esbuild scripts/verify-remote.ts --bundle --platform=node --format=esm --outfile=.tmp/verify-remote.mjs --log-level=warning && node .tmp/verify-parsers.mjs && node .tmp/verify-staging.mjs && esbuild scripts/verify-conflict.ts --bundle --platform=node --format=esm --outfile=.tmp/verify-conflict.mjs --log-level=warning && node .tmp/verify-remote.mjs && node .tmp/verify-conflict.mjs",
+    "verify": "esbuild scripts/verify-parsers.ts --bundle --platform=node --format=esm --outfile=.tmp/verify-parsers.mjs --log-level=warning && esbuild scripts/verify-staging.ts --bundle --platform=node --format=esm --outfile=.tmp/verify-staging.mjs --log-level=warning && esbuild scripts/verify-remote.ts --bundle --platform=node --format=esm --outfile=.tmp/verify-remote.mjs --log-level=warning && node .tmp/verify-parsers.mjs && node .tmp/verify-staging.mjs && esbuild scripts/verify-conflict.ts --bundle --platform=node --format=esm --outfile=.tmp/verify-conflict.mjs --log-level=warning && node .tmp/verify-remote.mjs && esbuild scripts/verify-compare.ts --bundle --platform=node --format=esm --outfile=.tmp/verify-compare.mjs --log-level=warning && node .tmp/verify-conflict.mjs && node .tmp/verify-compare.mjs",
     "tauri": "tauri",
     "app:dev": "tauri dev",
     "app:build": "tauri build"

@@ -107,6 +107,10 @@ fn base_cmd(req: &RunRequest) -> Command {
     cmd.current_dir(&req.cwd);
     cmd.env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_PAGER", "cat")
+        // rebase --continue / commit --amend 之类会调编辑器；给它一个 true，
+        // 否则在无 tty 的情况下 git 会直接报 "Terminal is dumb"
+        .env("GIT_EDITOR", "true")
+        .env("GIT_SEQUENCE_EDITOR", "true")
         .env("LC_ALL", "C");
     cmd.stdin(if req.input.is_some() {
         Stdio::piped()

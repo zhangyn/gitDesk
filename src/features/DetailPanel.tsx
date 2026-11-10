@@ -74,12 +74,32 @@ export function DetailPanel() {
   const fileTab = useStore((s) => s.fileTab);
   const activeTab = commitTabs.find((t) => t.key === fileTab) ?? null;
   const isStashView = target?.kind === 'stash';
+  const isCompareView = target?.kind === 'compare';
+  const compareInfo = useStore((s) => s.compareInfo);
   const isCommitView = target === null || target.kind === 'commit';
   const isConflict = conflictSides !== null;
   const entry = status?.entries.find((e) => e.path === target?.path);
 
   return (
     <div className="detail">
+      {isCompareView && target && (
+        <div className="pane-head commit-head">
+          <span className="commit-subject">
+            {activeTab?.label ?? `${target.a?.slice(0, 7)} ↔ ${target.b?.slice(0, 7)}`}
+          </span>
+          <span className="meta-dot">·</span>
+          <span className="meta-item">{activeTab?.subject}</span>
+          {compareInfo && (
+            <span className="sides-label">
+              · 中间 {compareInfo.commitCount} 个提交 · +{compareInfo.insertions} −
+              {compareInfo.deletions}
+            </span>
+          )}
+          <span className="spacer" />
+          <ModeToggle mode={mode} onChange={setMode} />
+        </div>
+      )}
+
       {isStashView && target && (
         <div className="pane-head commit-head">
           <span className="commit-subject" title={activeTab?.subject}>
@@ -113,7 +133,7 @@ export function DetailPanel() {
         </>
       )}
 
-      {!isCommitView && !isStashView && target && (
+      {!isCommitView && !isStashView && !isCompareView && target && (
         <div className="pane-head file-head">
           <span className="mono path" title={target.path}>
             {target.path}

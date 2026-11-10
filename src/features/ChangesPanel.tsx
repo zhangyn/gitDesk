@@ -195,6 +195,8 @@ export function ChangesPanel() {
             <span
               key={t.key}
               className={`file-tab commit-tab${t.kind === 'stash' ? ' stash-tab' : ''}${
+                t.kind === 'compare' ? ' compare-tab' : ''
+              }${
                 fileTab === t.key ? ' is-on' : ''
               }`}
             >

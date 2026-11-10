@@ -8,6 +8,7 @@ export function CommitPanel() {
   const lastCommitMessage = useStore((s) => s.lastCommitMessage);
   const busy = useStore((s) => s.busy);
   const branch = status?.branch.head ?? null;
+  const stagedStat = useStore((s) => s.stagedStat);
 
   const [message, setMessage] = useState('');
   const [amend, setAmend] = useState(false);
@@ -47,6 +48,9 @@ export function CommitPanel() {
         <span className="bp-title">提交</span>
         <span className="bp-sub">
           {branch ? `到 ${branch}` : 'detached HEAD'} · 已暂存 {counts.staged} 个文件
+          {stagedStat && stagedStat.files > 0
+            ? ` · +${stagedStat.insertions} −${stagedStat.deletions}`
+            : ''}
           {counts.worktree > 0 && counts.staged === 0
             ? '（工作区还有未暂存改动，先在左侧列表点 + 暂存）'
             : ''}

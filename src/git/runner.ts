@@ -8,6 +8,15 @@ import { useLog } from '../stores/log';
  */
 let gitPath = 'git';
 
+/**
+ * 我们自己跑的 git 命令会改磁盘（add/commit/checkout…），这些变化由调用方主动 reload。
+ * 记录一个时间窗，让文件监听在这个窗口内保持安静，避免"操作 → 监听 → 又刷新"的抖动。
+ */
+let suppressUntil = 0;
+export function watcherSuppressed(): boolean {
+  return Date.now() < suppressUntil;
+}
+
 export function setGitPath(p: string): void {
   if (p && p.length > 0) gitPath = p;
 }
@@ -59,6 +68,7 @@ export async function runGit(args: string[], opts: GitOpts): Promise<GitRunResul
     };
   }
   if (!opts.quiet) useLog.getState().push(args, opts.cwd, res);
+  suppressUntil = Date.now() + 800;
   return res;
 }
 

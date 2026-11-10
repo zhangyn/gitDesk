@@ -34,6 +34,11 @@ export default function App() {
   const pickRepo = useStore((s) => s.pickRepo);
   const theme = useStore((s) => s.theme);
   const setTheme = useStore((s) => s.setTheme);
+  const ongoing = useStore((s) => s.ongoing);
+  const status = useStore((s) => s.status);
+  const continueOp = useStore((s) => s.continueOp);
+  const skipOp = useStore((s) => s.skipOp);
+  const abortOp = useStore((s) => s.abortOp);
 
   const [leftW, setLeftW] = useState(loadLeftWidth);
   const hostRef = useRef<HTMLElement | null>(null);
@@ -111,6 +116,31 @@ export default function App() {
 
       {repo ? (
         <>
+          {ongoing && (
+            <div className="ongoing-banner">
+              <span className="ob-title">进行中：{ongoing}</span>
+              <span className="ob-sub">
+                {(status?.entries ?? []).filter((e) => e.kind === 'unmerged').length > 0
+                  ? `还有 ${
+                      (status?.entries ?? []).filter((e) => e.kind === 'unmerged').length
+                    } 个冲突文件待解决`
+                  : '所有冲突已解决，可以继续'}
+              </span>
+              <span className="spacer" />
+              <button className="btn small primary" onClick={() => void continueOp()}>
+                继续
+              </button>
+              {ongoing === 'rebase' && (
+                <button className="btn small" onClick={() => void skipOp()}>
+                  跳过此提交
+                </button>
+              )}
+              <button className="btn small danger" onClick={() => void abortOp()}>
+                中止
+              </button>
+            </div>
+          )}
+
           <main
             className="workspace"
             ref={hostRef}

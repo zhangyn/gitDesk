@@ -79,6 +79,7 @@ export function RefsPanel() {
   const createBranchOp = useStore((s) => s.createBranchOp);
   const createTrackingBranchOp = useStore((s) => s.createTrackingBranchOp);
   const openStash = useStore((s) => s.openStash);
+  const openCompare = useStore((s) => s.openCompare);
   const createTagOp = useStore((s) => s.createTagOp);
   const deleteTagOp = useStore((s) => s.deleteTagOp);
   const stashApplyOp = useStore((s) => s.stashApplyOp);
@@ -153,6 +154,13 @@ export function RefsPanel() {
               </button>
               {!current && (
                 <span className="row-actions">
+                  <button
+                    className="icon-btn"
+                    title="与当前分支对比"
+                    onClick={() => void openCompare(head ?? 'HEAD', b.name)}
+                  >
+                    ⧉
+                  </button>
                   <button
                     className="icon-btn danger"
                     title="删除分支"

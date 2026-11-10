@@ -2743,3 +2743,101 @@ body.is-resizing-x {
 .stash-tab.is-on {
   color: var(--violet);
 }
+
+/* ==================== v8：文件监听 / 对比 / 搜索 ==================== */
+
+/* 进行中操作横幅（merge / rebase / cherry-pick / revert） */
+.ongoing-banner {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px;
+  background: rgba(210, 153, 34, 0.13);
+  border-bottom: 1px solid rgba(210, 153, 34, 0.3);
+  flex: 0 0 auto;
+}
+
+.ob-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warn);
+  text-transform: capitalize;
+}
+
+.ob-sub {
+  font-size: 11.5px;
+  color: var(--fg-dim);
+}
+
+/* 提交历史搜索框 */
+.log-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.log-search input {
+  width: 190px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 11.5px;
+  font-weight: 400;
+  outline: none;
+}
+
+.log-search input:focus {
+  border-color: #2f6feb;
+  box-shadow: 0 0 0 2px rgba(31, 111, 235, 0.2);
+}
+
+.log-search .icon-btn {
+  width: 17px;
+  height: 17px;
+}
+
+/* 对比对话框 */
+.compare-modal {
+  width: min(560px, calc(100vw - 48px));
+}
+
+.cmp-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 10px;
+}
+
+.cmp-label {
+  flex: 0 0 84px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.cmp-row .modal-input {
+  flex: 1 1 auto;
+}
+
+.cmp-quick {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+/* 对比页签配色 */
+.file-tab.compare-tab {
+  color: var(--accent);
+}
+
+.compare-tab.is-on {
+  color: var(--accent);
+}
+
+/* 状态条上的"上次耗时" */
+.sb-item.danger {
+  color: var(--danger);
+}

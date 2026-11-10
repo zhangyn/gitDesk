@@ -79,3 +79,54 @@ export async function getOngoingOperation(repoPath: string): Promise<string | nu
   }
   return null;
 }
+
+/* --------------------------------------------------- 多步操作的后续动作 */
+
+export async function rebaseContinue(repoPath: string) {
+  return runGit(['rebase', '--continue'], { cwd: repoPath, timeoutMs: 300_000 });
+}
+
+export async function rebaseSkip(repoPath: string) {
+  return runGit(['rebase', '--skip'], { cwd: repoPath, timeoutMs: 300_000 });
+}
+
+export async function rebaseAbort(repoPath: string) {
+  return runGit(['rebase', '--abort'], { cwd: repoPath, timeoutMs: 300_000 });
+}
+
+export async function cherryPickContinue(repoPath: string) {
+  return runGit(['cherry-pick', '--continue'], { cwd: repoPath, timeoutMs: 300_000 });
+}
+
+export async function cherryPickAbort(repoPath: string) {
+  return runGit(['cherry-pick', '--abort'], { cwd: repoPath, timeoutMs: 300_000 });
+}
+
+export async function revertContinue(repoPath: string) {
+  return runGit(['revert', '--continue'], { cwd: repoPath, timeoutMs: 300_000 });
+}
+
+export async function revertAbort(repoPath: string) {
+  return runGit(['revert', '--abort'], { cwd: repoPath, timeoutMs: 300_000 });
+}
+
+/** 逐条列出 A..B 的提交（对比视图里展示"中间有哪些提交"） */
+export async function listRangeCommits(
+  repoPath: string,
+  a: string,
+  b: string,
+  limit = 200,
+): Promise<Array<{ sha: string; subject: string; author: string }>> {
+  const res = await runGit(
+    ['log', '--topo-order', '-n', String(limit), '--format=%H%x1f%an%x1f%s', `${a}..${b}`],
+    { cwd: repoPath, quiet: true, timeoutMs: 60_000 },
+  );
+  if (res.code !== 0) return [];
+  return res.stdout
+    .split(/\r?\n/)
+    .filter((l) => l.trim())
+    .map((l) => {
+      const [sha, author, subject] = l.split('\x1f');
+      return { sha, author: author ?? '', subject: subject ?? '' };
+    });
+}

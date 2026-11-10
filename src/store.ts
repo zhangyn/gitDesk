@@ -13,10 +13,23 @@ import type {
   Side,
   StatusEntry,
 } from './types';
-import { probeGit, runGit } from './git/runner';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { probeGit, runGit, watcherSuppressed } from './git/runner';
 import { openRepo } from './git/ops/repo';
 import { getStatus } from './git/ops/status';
-import { getCommitFiles, getLog, type LogScope } from './git/ops/log';
+import {
+  getCommitFiles,
+  getLog,
+  searchLog,
+  type LogScope,
+  type LogSearch,
+} from './git/ops/log';
+import {
+  compareFileDiff,
+  compareFiles,
+  compareStat,
+  resolveRev,
+} from './git/ops/compare';
 import { getRefs } from './git/ops/refs';
 import { getCommitDiff, getUntrackedDiff, getWorktreeDiff } from './git/ops/diff';
 import {
@@ -30,12 +43,19 @@ import {
 } from './git/ops/indexOps';
 import { createCommit, getLastCommitMessage, type CommitOptions } from './git/ops/commit';
 import {
+  cherryPickAbort,
+  cherryPickContinue,
   createBranch,
   createTrackingBranch,
   deleteBranch,
   getOngoingOperation,
   mergeBranch,
+  rebaseAbort,
+  rebaseContinue,
   rebaseOnto,
+  rebaseSkip,
+  revertAbort,
+  revertContinue,
   switchBranch,
 } from './git/ops/branch';
 import {
@@ -83,21 +103,36 @@ const LOG_LIMIT = 400;
 const MAX_RECENT = 24;
 
 export interface DiffTarget {
-  kind: 'commit' | 'file' | 'stash';
+  kind: 'commit' | 'file' | 'stash' | 'compare';
   path: string;
   sha?: string;
   /** stash 视图：stash@{n} */
   ref?: string;
+  /** compare 视图：解析后的两个 sha */
+  a?: string;
+  b?: string;
 }
 
-export type TabKind = 'commit' | 'stash';
+export type TabKind = 'commit' | 'stash' | 'compare';
 
 export interface CommitTab {
   kind: TabKind;
-  /** commit: sha；stash: `stash:stash@{0}` */
+  /** commit: sha；stash: `stash:stash@{0}`；compare: `compare:a...b` */
   key: string;
   label: string;
   subject: string;
+  /** compare 专用的两个原始 rev（可能是分支名） */
+  a?: string;
+  b?: string;
+}
+
+export interface CompareInfo {
+  aSha: string;
+  bSha: string;
+  /** A..B 之间的提交数 */
+  commitCount: number;
+  insertions: number;
+  deletions: number;
 }
 
 /** 页签 key → stash ref */
@@ -178,6 +213,15 @@ interface AppStore {
   /** 提交历史的范围：local = 本地分支+HEAD，all = 含远程 */
   logScope: LogScope;
   setLogScope: (scope: LogScope) => void;
+  /** 提交历史搜索（null = 不过滤） */
+  logQuery: LogSearch | null;
+  logSearching: boolean;
+  setLogQuery: (mode: 'message' | 'path', text: string) => void;
+  clearLogQuery: () => void;
+  /** 对比视图的元信息 */
+  compareInfo: CompareInfo | null;
+  /** 暂存区统计（提交面板用） */
+  stagedStat: { files: number; insertions: number; deletions: number } | null;
   /** 上方文件区的页签集合与当前页签 */
   commitTabs: CommitTab[];
   fileTab: FileTabKey;
@@ -204,10 +248,13 @@ interface AppStore {
   removeRecent: (path: string) => void;
   refreshRepoBranches: () => Promise<void>;
   refresh: () => Promise<void>;
+  /** 只刷新变更与引用（文件监听触发，轻量） */
+  refreshLight: () => Promise<void>;
   clearError: () => void;
 
   openCommit: (sha: string) => Promise<void>;
   openStash: (ref: string) => Promise<void>;
+  openCompare: (a: string, b: string) => Promise<void>;
   closeCommitTab: (key: string) => Promise<void>;
   setFileTab: (key: FileTabKey) => Promise<void>;
   showTabFile: (file: CommitFile) => Promise<void>;
@@ -235,6 +282,10 @@ interface AppStore {
   applyResolved: () => Promise<void>;
   checkoutSideOp: (path: string, side: 'ours' | 'theirs') => Promise<void>;
   abortMergeOp: () => Promise<void>;
+  /** 中断后的后续动作：rebase / cherry-pick / revert */
+  continueOp: () => Promise<void>;
+  skipOp: () => Promise<void>;
+  abortOp: () => Promise<void>;
 
   lastCommitMessage: () => Promise<string>;
   doCommit: (opts: CommitOptions) => Promise<boolean>;
@@ -274,6 +325,10 @@ const EMPTY_REPO_STATE = {
   selectedSha: null,
   commitFiles: [] as CommitFile[],
   logScope: 'local' as LogScope,
+  logQuery: null,
+  logSearching: false,
+  compareInfo: null,
+  stagedStat: null,
   commitTabs: [] as CommitTab[],
   fileTab: 'worktree' as FileTabKey,
   diffModal: false,
@@ -287,6 +342,42 @@ const EMPTY_REPO_STATE = {
   decisions: {} as Record<number, Decision>,
   diffLoading: false,
 };
+
+/* --------------------------------------------------------------- 文件监听 */
+
+let unlistenChanged: UnlistenFn | null = null;
+let watchTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 开始监听仓库：磁盘一变就让 UI 自己跟上，不用手动 F5 */
+async function startWatch(path: string): Promise<void> {
+  try {
+    await invoke('watch_repo', { path });
+  } catch {
+    return; // 监听失败不影响正常使用
+  }
+  if (unlistenChanged) return;
+  unlistenChanged = await listen<{ scope?: string }>('repo://changed', (ev) => {
+    // 我们自己刚跑过写命令，那边的 reload 会负责刷新
+    if (watcherSuppressed()) return;
+    const scope = ev.payload?.scope ?? 'worktree';
+    if (watchTimer) clearTimeout(watchTimer);
+    watchTimer = setTimeout(() => {
+      const st = useStore.getState();
+      if (!st.repo) return;
+      // .git 内部变了（切分支/提交/合并）→ 全量刷；只是工作区文件改了 → 轻量刷
+      if (scope === 'git') void st.refresh();
+      else void st.refreshLight();
+    }, 250);
+  });
+}
+
+function stopWatch(): void {
+  if (watchTimer) {
+    clearTimeout(watchTimer);
+    watchTimer = null;
+  }
+  void invoke('unwatch_repo').catch(() => {});
+}
 
 export const useStore = create<AppStore>()((set, get) => {
   function getRepoPath(): string {
@@ -366,11 +457,40 @@ export const useStore = create<AppStore>()((set, get) => {
     });
 
     try {
+      if (tab.kind === 'compare') {
+        const a = tab.a ?? '';
+        const b = tab.b ?? '';
+        const res = await compareFiles(repo.path, a, b);
+        const stat = await compareStat(repo.path, res.aSha, res.bSha);
+        set({
+          commitFiles: res.files,
+          compareInfo: {
+            aSha: res.aSha,
+            bSha: res.bSha,
+            commitCount: res.commitCount,
+            insertions: stat.insertions,
+            deletions: stat.deletions,
+          },
+        });
+        if (res.files.length > 0) {
+          const first = res.files[0];
+          const patches = await compareFileDiff(repo.path, res.aSha, res.bSha, first.path);
+          set({
+            patches,
+            worktreePatches: patches,
+            stagedPatches: [],
+            side: 'worktree',
+            target: { kind: 'compare', a: res.aSha, b: res.bSha, path: first.path },
+          });
+        }
+        return;
+      }
+
       const files =
         tab.kind === 'stash'
           ? await stashFiles(repo.path, stashRefOfKey(tab.key))
           : await getCommitFiles(repo.path, tab.key);
-      set({ commitFiles: files });
+      set({ commitFiles: files, compareInfo: null });
       if (files.length > 0) {
         const first = files[0];
         const patches =
@@ -494,6 +614,7 @@ export const useStore = create<AppStore>()((set, get) => {
         ].slice(0, MAX_RECENT);
         saveRecent(recent);
         set({ repo, recent, bottomPanel: 'none' });
+        await startWatch(repo.path);
         await get().refresh();
       } catch (e) {
         set({ error: errMsg(e), repo: null });
@@ -503,6 +624,7 @@ export const useStore = create<AppStore>()((set, get) => {
     },
 
     closeRepo() {
+      stopWatch();
       set({ repo: null, ...EMPTY_REPO_STATE, bottomPanel: 'none' });
     },
 
@@ -537,15 +659,35 @@ export const useStore = create<AppStore>()((set, get) => {
       if (!repo) return;
       set({ busy: '刷新…', error: null });
       try {
-        const [status, commits, refs, stashes, backups, ongoing, remotes] = await Promise.all([
-          getStatus(repo.path),
-          getLog(repo.path, LOG_LIMIT, get().logScope),
-          getRefs(repo.path),
-          listStashes(repo.path),
-          listBackups(repo.path),
-          getOngoingOperation(repo.path),
-          listRemotes(repo.path),
-        ]);
+        const search = get().logQuery;
+        const [status, commits, refs, stashes, backups, ongoing, remotes, stat] =
+          await Promise.all([
+            getStatus(repo.path),
+            search && search.text.trim()
+              ? searchLog(repo.path, LOG_LIMIT, search, get().logScope)
+              : getLog(repo.path, LOG_LIMIT, get().logScope),
+            getRefs(repo.path),
+            listStashes(repo.path),
+            listBackups(repo.path),
+            getOngoingOperation(repo.path),
+            listRemotes(repo.path),
+            runGit(['diff', '--cached', '--shortstat'], {
+              cwd: repo.path,
+              quiet: true,
+              timeoutMs: 30_000,
+            }),
+          ]);
+        const statText = stat.stdout.trim();
+        const statFiles = /(\d+) file/.exec(statText);
+        const statIns = /(\d+) insertion/.exec(statText);
+        const statDel = /(\d+) deletion/.exec(statText);
+        set({
+          stagedStat: {
+            files: statFiles ? Number(statFiles[1]) : 0,
+            insertions: statIns ? Number(statIns[1]) : 0,
+            deletions: statDel ? Number(statDel[1]) : 0,
+          },
+        });
         const remote =
           remotes.find((r) => r.name === get().remote)?.name ??
           remotes.find((r) => r.name === 'origin')?.name ??
@@ -572,7 +714,9 @@ export const useStore = create<AppStore>()((set, get) => {
         const tabs = get().commitTabs.filter((t) =>
           t.kind === 'stash'
             ? stashes.some((s) => `stash:${s.ref}` === t.key)
-            : commits.some((c) => c.sha === t.key),
+            : t.kind === 'compare'
+              ? true
+              : commits.some((c) => c.sha === t.key),
         );
         let tab = get().fileTab;
         if (tab !== 'worktree' && !tabs.some((t) => t.key === tab)) tab = 'worktree';
@@ -592,8 +736,35 @@ export const useStore = create<AppStore>()((set, get) => {
       }
     },
 
+    /** 只刷变更与引用：文件监听触发时用，不重拉日志、不动当前 diff */
+    async refreshLight() {
+      const repo = get().repo;
+      if (!repo) return;
+      if (get().busy) return; // 别打断正在进行的操作
+      try {
+        const [status, refs] = await Promise.all([getStatus(repo.path), getRefs(repo.path)]);
+        set({ status, refs });
+        const t = get().target;
+        if (t && t.kind === 'file' && !status.entries.some((e) => e.path === t.path)) {
+          set({ target: null, patches: [], worktreePatches: [], stagedPatches: [] });
+        }
+      } catch {
+        /* 文件正在被写时 status 可能瞬时失败，忽略 */
+      }
+    },
+
     clearError() {
       set({ error: null });
+    },
+
+    setLogQuery(mode, text) {
+      set({ logQuery: text.trim() ? { mode, text } : null, logSearching: Boolean(text.trim()) });
+      void get().refresh();
+    },
+
+    clearLogQuery() {
+      set({ logQuery: null, logSearching: false });
+      void get().refresh();
     },
 
     async openCommit(sha) {
@@ -603,6 +774,26 @@ export const useStore = create<AppStore>()((set, get) => {
         key: sha,
         label: `提交 ${sha.slice(0, 7)}`,
         subject: commit?.subject ?? sha.slice(0, 8),
+      });
+    },
+
+    async openCompare(a, b) {
+      const repo = get().repo;
+      if (!repo) return;
+      // 先校验，避免用户看到空标签页却不知道错在哪
+      const [aSha, bSha] = await Promise.all([resolveRev(repo.path, a), resolveRev(repo.path, b)]);
+      if (!aSha || !bSha) {
+        set({ error: !aSha ? `无法解析左侧版本：${a}` : `无法解析右侧版本：${b}` });
+        return;
+      }
+      const short = (s: string) => s.slice(0, 7);
+      await activateTab({
+        kind: 'compare',
+        key: `compare:${aSha}...${bSha}`,
+        label: `${short(aSha)} ↔ ${short(bSha)}`,
+        subject: `${a} ↔ ${b}`,
+        a,
+        b,
       });
     },
 
@@ -645,6 +836,7 @@ export const useStore = create<AppStore>()((set, get) => {
       const tab = get().commitTabs.find((t) => t.key === key);
       if (!tab) return;
       if (tab.kind === 'stash') await get().openStash(stashRefOfKey(key));
+      else if (tab.kind === 'compare') await get().openCompare(tab.a ?? '', tab.b ?? '');
       else await get().openCommit(key);
     },
 
@@ -673,11 +865,16 @@ export const useStore = create<AppStore>()((set, get) => {
       const tab = get().commitTabs.find((t) => t.key === get().fileTab);
       if (!tab) return;
       const isStash = tab.kind === 'stash';
+      const isCompare = tab.kind === 'compare';
       const ref = stashRefOfKey(tab.key);
+      const cmp = get().compareInfo;
+      if (isCompare && !cmp) return;
       set({
         target: isStash
           ? { kind: 'stash', ref, path: file.path }
-          : { kind: 'commit', sha: tab.key, path: file.path },
+          : isCompare
+            ? { kind: 'compare', a: cmp!.aSha, b: cmp!.bSha, path: file.path }
+            : { kind: 'commit', sha: tab.key, path: file.path },
         patches: [],
         worktreePatches: [],
         stagedPatches: [],
@@ -687,7 +884,9 @@ export const useStore = create<AppStore>()((set, get) => {
       try {
         const patches = isStash
           ? await stashFileDiff(repo.path, ref, file.path)
-          : await getCommitDiff(repo.path, tab.key, file.path);
+          : isCompare
+            ? await compareFileDiff(repo.path, cmp!.aSha, cmp!.bSha, file.path)
+            : await getCommitDiff(repo.path, tab.key, file.path);
         set({ patches, worktreePatches: patches });
       } catch (e) {
         set({ error: errMsg(e) });
@@ -867,6 +1066,56 @@ export const useStore = create<AppStore>()((set, get) => {
       await mutate('中止合并', false, async () => {
         const res = await abortMerge(getRepoPath());
         if (res.code !== 0) throw new Error(res.stderr.trim() || 'merge --abort 失败');
+      });
+      set({ conflictSides: null, decisions: {} });
+    },
+
+    async continueOp() {
+      const op = get().ongoing;
+      if (!op) return;
+      await mutate(`继续 ${op}`, false, async () => {
+        const repo = getRepoPath();
+        const res =
+          op === 'rebase'
+            ? await rebaseContinue(repo)
+            : op === 'cherry-pick'
+              ? await cherryPickContinue(repo)
+              : await revertContinue(repo);
+        if (res.code !== 0) throw new Error(res.stderr.trim() || `${op} --continue 失败`);
+      });
+    },
+
+    async skipOp() {
+      const op = get().ongoing;
+      if (!op) return;
+      await mutate(`跳过当前提交`, false, async () => {
+        const repo = getRepoPath();
+        const res = op === 'rebase' ? await rebaseSkip(repo) : await cherryPickAbort(repo);
+        if (res.code !== 0) throw new Error(res.stderr.trim() || `${op} --skip 失败`);
+      });
+    },
+
+    async abortOp() {
+      const op = get().ongoing;
+      if (!op) return;
+      const ok = await confirmBox({
+        title: `中止这次 ${op}？`,
+        body: '会回到操作前的状态，期间已处理的冲突全部丢弃。',
+        okText: '中止',
+        danger: true,
+      });
+      if (!ok) return;
+      await mutate(`中止 ${op}`, false, async () => {
+        const repo = getRepoPath();
+        const res =
+          op === 'rebase'
+            ? await rebaseAbort(repo)
+            : op === 'cherry-pick'
+              ? await cherryPickAbort(repo)
+              : op === 'revert'
+                ? await revertAbort(repo)
+                : await abortMerge(repo);
+        if (res.code !== 0) throw new Error(res.stderr.trim() || `中止 ${op} 失败`);
       });
       set({ conflictSides: null, decisions: {} });
     },

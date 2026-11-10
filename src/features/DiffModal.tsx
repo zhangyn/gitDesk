@@ -35,7 +35,9 @@ export function DiffModal() {
       ? `提交 ${target.sha?.slice(0, 8)} · ${target.path}`
       : target.kind === 'stash'
         ? `${target.ref} · ${target.path}`
-        : target.path;
+        : target.kind === 'compare'
+          ? `${target.a?.slice(0, 7)} ↔ ${target.b?.slice(0, 7)} · ${target.path}`
+          : target.path;
 
   return (
     <div className="modal-mask diff-mask" onMouseDown={close}>
@@ -50,7 +52,9 @@ export function DiffModal() {
               ? '父提交 ↔ 本次提交'
               : target.kind === 'stash'
                 ? 'stash 基线 ↔ stash 内容'
-                : side === 'staged'
+                : target.kind === 'compare'
+                  ? '左侧 ↔ 右侧（净差异）'
+                  : side === 'staged'
                   ? 'HEAD ↔ 暂存区'
                   : '暂存区 ↔ 工作区'}
           </span>

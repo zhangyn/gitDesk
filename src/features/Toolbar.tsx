@@ -4,8 +4,10 @@ import { MenuItem, MenuSep, Popover } from '../ui/Popover';
 import { promptBox } from '../ui/dialog';
 import type { RefEntry } from '../types';
 import { THEME_LABEL, nextTheme } from '../ui/theme';
+import { CompareDialog } from './CompareDialog';
 import {
   IconBranch,
+  IconCompare,
   IconChevron,
   IconCommit,
   IconFolder,
@@ -123,6 +125,7 @@ export function Toolbar() {
   const setLogScope = useStore((s) => s.setLogScope);
   const theme = useStore((s) => s.theme);
   const setTheme = useStore((s) => s.setTheme);
+  const [compareOpen, setCompareOpen] = useState(false);
 
   const counts = countEntries(status);
   const branch = status?.branch.head ?? null;
@@ -267,6 +270,13 @@ export function Toolbar() {
       </Popover>
 
       <TB icon={IconTag} label="标签" disabled={disabled || noRepo} onClick={() => void newTag()} />
+      <TB
+        icon={IconCompare}
+        label="对比"
+        disabled={disabled || noRepo}
+        onClick={() => setCompareOpen(true)}
+        title="对比两个分支/提交"
+      />
 
       <Popover
         width={230}
@@ -340,6 +350,8 @@ export function Toolbar() {
       >
         {theme === 'light' ? '☀' : theme === 'dark' ? '🌙' : '◐'}
       </button>
+
+      <CompareDialog open={compareOpen} onClose={() => setCompareOpen(false)} />
     </header>
   );
 }

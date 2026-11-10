@@ -159,6 +159,16 @@ export function IconUnified({ size, className }: P) {
   );
 }
 
+export function IconCompare({ size, className }: P) {
+  return (
+    <svg {...base(size)} className={className}>
+      <rect x="2" y="2.6" width="7.4" height="7.4" rx="1.6" />
+      <rect x="6.6" y="6.6" width="7.4" height="7.4" rx="1.6" />
+      <path d="M8.6 10.2h3.6" />
+    </svg>
+  );
+}
+
 export function IconChevron({ size, className }: P) {
   return (
     <svg {...base(size)} className={className}>
