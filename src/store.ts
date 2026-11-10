@@ -1,0 +1,1109 @@
+import { create } from 'zustand';
+import { invoke } from '@tauri-apps/api/core';
+import { open as openDirDialog } from '@tauri-apps/plugin-dialog';
+import type {
+  Commit,
+  CommitFile,
+  FilePatch,
+  ProbeResult,
+  RefEntry,
+  RepoEntry,
+  RepoInfo,
+  RepoStatus,
+  Side,
+  StatusEntry,
+} from './types';
+import { probeGit, runGit } from './git/runner';
+import { openRepo } from './git/ops/repo';
+import { getStatus } from './git/ops/status';
+import { getCommitFiles, getLog, type LogScope } from './git/ops/log';
+import { getRefs } from './git/ops/refs';
+import { getCommitDiff, getUntrackedDiff, getWorktreeDiff } from './git/ops/diff';
+import {
+  applyPatchToIndex,
+  applyPatchToWorktree,
+  discardFileChanges,
+  stageAll,
+  stageFile,
+  unstageAll,
+  unstageFile,
+} from './git/ops/indexOps';
+import { createCommit, getLastCommitMessage, type CommitOptions } from './git/ops/commit';
+import {
+  createBranch,
+  createTrackingBranch,
+  deleteBranch,
+  getOngoingOperation,
+  mergeBranch,
+  rebaseOnto,
+  switchBranch,
+} from './git/ops/branch';
+import {
+  applyStash,
+  createBackup,
+  dropStash,
+  listBackups,
+  listStashes,
+  restoreBackup,
+  saveStash,
+  type BackupEntry,
+  type StashEntry,
+} from './git/ops/stash';
+import { createTag, deleteTag } from './git/ops/tag';
+import { stashFileDiff, stashFiles } from './git/ops/stash';
+import {
+  fetchRemote,
+  humanizeRemoteError,
+  listRemotes,
+  pullRemote,
+  pushRemote,
+  type RemoteInfo,
+} from './git/ops/remote';
+import {
+  abortMerge,
+  checkoutSide,
+  loadConflictSides,
+  markResolved,
+  writeResolvedFile,
+  type ConflictSides,
+} from './git/ops/conflict';
+import {
+  parseConflictFile,
+  resolveConflict,
+  undecidedCount,
+  type Decision,
+} from './conflict/parse';
+import { layoutGraph, type GraphRow } from './features/graph/layout';
+import { buildSelectedPatch } from './patch/build';
+import { confirmBox } from './ui/dialog';
+import { applyTheme, loadTheme, syncWindowTheme, watchSystemTheme } from './ui/theme';
+
+const RECENT_KEY = 'gitdesk.recent';
+const LOG_LIMIT = 400;
+const MAX_RECENT = 24;
+
+export interface DiffTarget {
+  kind: 'commit' | 'file' | 'stash';
+  path: string;
+  sha?: string;
+  /** stash 视图：stash@{n} */
+  ref?: string;
+}
+
+export type TabKind = 'commit' | 'stash';
+
+export interface CommitTab {
+  kind: TabKind;
+  /** commit: sha；stash: `stash:stash@{0}` */
+  key: string;
+  label: string;
+  subject: string;
+}
+
+/** 页签 key → stash ref */
+export function stashRefOfKey(key: string): string {
+  return key.startsWith('stash:') ? key.slice('stash:'.length) : key;
+}
+
+/** 上方文件区的页签：worktree = 当前工作区，其它值是提交 sha */
+export type FileTabKey = 'worktree' | string;
+
+export type Theme = 'dark' | 'light' | 'system';
+
+export type BottomPanel = 'none' | 'commit' | 'log';
+
+function errMsg(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === 'string') return e;
+  return String(e);
+}
+
+function loadRecent(): RepoEntry[] {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY);
+    if (!raw) return [];
+    const list = JSON.parse(raw) as RepoEntry[];
+    if (!Array.isArray(list)) return [];
+    return list.filter((r) => r && typeof r.path === 'string' && typeof r.name === 'string');
+  } catch {
+    return [];
+  }
+}
+
+function saveRecent(list: RepoEntry[]): void {
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, MAX_RECENT)));
+  } catch {
+    /* 配额/隐私模式下静默失败 */
+  }
+}
+
+function pickSide(worktree: FilePatch[], staged: FilePatch[]): Side {
+  if (worktree.length > 0) return 'worktree';
+  return staged.length > 0 ? 'staged' : 'worktree';
+}
+
+function hasWorktree(entry: StatusEntry): boolean {
+  return entry.kind === 'untracked' || entry.worktree !== '.';
+}
+
+function hasStaged(entry: StatusEntry): boolean {
+  return entry.kind !== 'untracked' && entry.index !== '.';
+}
+
+interface AppStore {
+  booted: boolean;
+  git: ProbeResult | null;
+  busy: string | null;
+  error: string | null;
+
+  repo: RepoInfo | null;
+  recent: RepoEntry[];
+  /** 每个最近仓库的当前分支（用于左栏显示 name (branch)） */
+  repoBranches: Record<string, string>;
+
+  status: RepoStatus | null;
+  refs: RefEntry[];
+  commits: Commit[];
+  graph: GraphRow[];
+  stashes: StashEntry[];
+  backups: BackupEntry[];
+  ongoing: string | null;
+  remotes: RemoteInfo[];
+  remote: string;
+
+  selectedSha: string | null;
+  commitFiles: CommitFile[];
+
+  /** 提交历史的范围：local = 本地分支+HEAD，all = 含远程 */
+  logScope: LogScope;
+  setLogScope: (scope: LogScope) => void;
+  /** 上方文件区的页签集合与当前页签 */
+  commitTabs: CommitTab[];
+  fileTab: FileTabKey;
+  /** 双击文件打开的大窗 diff */
+  diffModal: boolean;
+  theme: Theme;
+
+  target: DiffTarget | null;
+  worktreePatches: FilePatch[];
+  stagedPatches: FilePatch[];
+  side: Side;
+  patches: FilePatch[];
+  selection: Set<string>;
+  conflictSides: ConflictSides | null;
+  decisions: Record<number, Decision>;
+  diffLoading: boolean;
+
+  bottomPanel: BottomPanel;
+
+  boot: () => Promise<void>;
+  pickRepo: () => Promise<void>;
+  openPath: (path: string) => Promise<void>;
+  closeRepo: () => void;
+  removeRecent: (path: string) => void;
+  refreshRepoBranches: () => Promise<void>;
+  refresh: () => Promise<void>;
+  clearError: () => void;
+
+  openCommit: (sha: string) => Promise<void>;
+  openStash: (ref: string) => Promise<void>;
+  closeCommitTab: (key: string) => Promise<void>;
+  setFileTab: (key: FileTabKey) => Promise<void>;
+  showTabFile: (file: CommitFile) => Promise<void>;
+  createTrackingBranchOp: (localName: string, remoteRef: string) => Promise<void>;
+  openDiffModal: () => void;
+  closeDiffModal: () => void;
+  setTheme: (theme: Theme) => void;
+  showChange: (entry: StatusEntry) => Promise<void>;
+  setSide: (side: Side) => void;
+
+  toggleKeys: (keys: string[]) => void;
+  clearSelection: () => void;
+
+  stageSelection: () => Promise<void>;
+  unstageSelection: () => Promise<void>;
+  discardSelection: () => Promise<void>;
+  stageEntry: (entry: StatusEntry) => Promise<void>;
+  unstageEntry: (entry: StatusEntry) => Promise<void>;
+  discardEntry: (entry: StatusEntry) => Promise<void>;
+  stageAllOp: () => Promise<void>;
+  unstageAllOp: () => Promise<void>;
+
+  setDecision: (blockId: number, decision: Decision) => void;
+  decideAll: (decision: Decision) => void;
+  applyResolved: () => Promise<void>;
+  checkoutSideOp: (path: string, side: 'ours' | 'theirs') => Promise<void>;
+  abortMergeOp: () => Promise<void>;
+
+  lastCommitMessage: () => Promise<string>;
+  doCommit: (opts: CommitOptions) => Promise<boolean>;
+  setBottomPanel: (p: BottomPanel) => void;
+
+  createBranchOp: (name: string) => Promise<void>;
+  switchBranchOp: (name: string) => Promise<void>;
+  deleteBranchOp: (name: string) => Promise<void>;
+  mergeBranchOp: (name: string) => Promise<void>;
+  rebaseOntoOp: (name: string) => Promise<void>;
+
+  stashSaveOp: (message: string) => Promise<void>;
+  stashApplyOp: (ref: string, drop: boolean) => Promise<void>;
+  stashDropOp: (ref: string) => Promise<void>;
+
+  createTagOp: (name: string, message: string) => Promise<void>;
+  deleteTagOp: (name: string) => Promise<void>;
+
+  restoreBackupOp: (sha: string) => Promise<void>;
+
+  setRemote: (name: string) => void;
+  fetchOp: () => Promise<void>;
+  pullOp: (strategy: 'ff-only' | 'rebase' | 'merge') => Promise<void>;
+  pushOp: (force: boolean) => Promise<void>;
+}
+
+const EMPTY_REPO_STATE = {
+  status: null,
+  refs: [] as RefEntry[],
+  commits: [] as Commit[],
+  graph: [] as GraphRow[],
+  stashes: [] as StashEntry[],
+  backups: [] as BackupEntry[],
+  ongoing: null,
+  remotes: [] as RemoteInfo[],
+  remote: 'origin',
+  selectedSha: null,
+  commitFiles: [] as CommitFile[],
+  logScope: 'local' as LogScope,
+  commitTabs: [] as CommitTab[],
+  fileTab: 'worktree' as FileTabKey,
+  diffModal: false,
+  target: null,
+  worktreePatches: [] as FilePatch[],
+  stagedPatches: [] as FilePatch[],
+  side: 'worktree' as Side,
+  patches: [] as FilePatch[],
+  selection: new Set<string>(),
+  conflictSides: null,
+  decisions: {} as Record<number, Decision>,
+  diffLoading: false,
+};
+
+export const useStore = create<AppStore>()((set, get) => {
+  function getRepoPath(): string {
+    const repo = get().repo;
+    if (!repo) throw new Error('没有打开仓库');
+    return repo.path;
+  }
+
+  /** 统一的写操作包装：backup → 执行 → 刷新 → 重载当前 diff */
+  async function mutate(
+    label: string,
+    backup: boolean,
+    fn: () => Promise<void>,
+  ): Promise<boolean> {
+    const repo = get().repo;
+    if (!repo) return false;
+    set({ busy: label, error: null });
+    try {
+      if (backup) await createBackup(repo.path, label);
+      await fn();
+      await reload();
+      return true;
+    } catch (e) {
+      set({ error: errMsg(e) });
+      return false;
+    } finally {
+      set({ busy: null });
+    }
+  }
+
+  /** 刷新数据并尽量保持当前 diff 视角 */
+  async function reload(): Promise<void> {
+    await get().refresh();
+    const target = get().target;
+    if (!target || target.kind === 'commit') return;
+
+    if (get().conflictSides) {
+      // 冲突文件：重新读冲突段
+      try {
+        const sides = await loadConflictSides(getRepoPath(), target.path);
+        set({ conflictSides: sides });
+        if (!sides.hasMarkers) set({ decisions: {} });
+      } catch {
+        set({ conflictSides: null });
+      }
+      return;
+    }
+
+    const entry = get().status?.entries.find((e) => e.path === target.path);
+    if (!entry) {
+      set({ target: null, patches: [], worktreePatches: [], stagedPatches: [] });
+      return;
+    }
+    await loadFileDiff(entry, false);
+  }
+
+  /** 打开/激活一个页签（commit 或 stash），并加载它的文件列表与首个文件 diff */
+  async function activateTab(tab: CommitTab): Promise<void> {
+    const repo = get().repo;
+    if (!repo) return;
+    const tabs = get().commitTabs.some((t) => t.key === tab.key)
+      ? get().commitTabs
+      : [...get().commitTabs, tab].slice(-8);
+
+    set({
+      commitTabs: tabs,
+      fileTab: tab.key,
+      selectedSha: tab.kind === 'commit' ? tab.key : get().selectedSha,
+      commitFiles: [],
+      target: null,
+      conflictSides: null,
+      worktreePatches: [],
+      stagedPatches: [],
+      patches: [],
+      selection: new Set<string>(),
+      diffLoading: true,
+    });
+
+    try {
+      const files =
+        tab.kind === 'stash'
+          ? await stashFiles(repo.path, stashRefOfKey(tab.key))
+          : await getCommitFiles(repo.path, tab.key);
+      set({ commitFiles: files });
+      if (files.length > 0) {
+        const first = files[0];
+        const patches =
+          tab.kind === 'stash'
+            ? await stashFileDiff(repo.path, stashRefOfKey(tab.key), first.path)
+            : await getCommitDiff(repo.path, tab.key, first.path);
+        set({
+          patches,
+          worktreePatches: patches,
+          stagedPatches: [],
+          side: 'worktree',
+          target:
+            tab.kind === 'stash'
+              ? { kind: 'stash', ref: stashRefOfKey(tab.key), path: first.path }
+              : { kind: 'commit', sha: tab.key, path: first.path },
+        });
+      }
+    } catch (e) {
+      set({ error: errMsg(e) });
+    } finally {
+      set({ diffLoading: false });
+    }
+  }
+
+  async function loadFileDiff(entry: StatusEntry, resetSide: boolean): Promise<void> {
+    const repoPath = getRepoPath();
+    const prevSide = get().side;
+    set({ diffLoading: true, selection: new Set<string>() });
+    try {
+      const [worktree, staged] = await Promise.all([
+        entry.kind === 'untracked'
+          ? getUntrackedDiff(repoPath, entry.path)
+          : hasWorktree(entry)
+            ? getWorktreeDiff(repoPath, entry.path, false)
+            : Promise.resolve([] as FilePatch[]),
+        hasStaged(entry) ? getWorktreeDiff(repoPath, entry.path, true) : Promise.resolve([]),
+      ]);
+
+      const side = resetSide
+        ? pickSide(worktree, staged)
+        : prevSide === 'staged' && staged.length > 0
+          ? 'staged'
+          : prevSide === 'worktree' && worktree.length > 0
+            ? 'worktree'
+            : pickSide(worktree, staged);
+
+      set({
+        worktreePatches: worktree,
+        stagedPatches: staged,
+        side,
+        patches: side === 'staged' ? staged : worktree,
+        target: { kind: 'file', path: entry.path },
+        conflictSides: null,
+      });
+    } catch (e) {
+      set({ error: errMsg(e) });
+    } finally {
+      set({ diffLoading: false });
+    }
+  }
+
+  return {
+    booted: false,
+    git: null,
+    busy: null,
+    error: null,
+    repo: null,
+    recent: loadRecent(),
+    repoBranches: {},
+    ...EMPTY_REPO_STATE,
+    bottomPanel: 'none',
+    theme: loadTheme(),
+
+    async boot() {
+      if (get().booted) return;
+      set({ booted: true });
+      applyTheme(get().theme);
+      void syncWindowTheme(get().theme);
+      watchSystemTheme(() => {
+        if (get().theme === 'system') {
+          applyTheme('system');
+          void syncWindowTheme('system');
+        }
+      });
+      try {
+        const info = await probeGit();
+        set({ git: info });
+        if (!info.found) {
+          set({ error: '未找到 git。请安装 Git for Windows，并确认 git 在 PATH 中。' });
+          return;
+        }
+        const cliRepo = await invoke<string | null>('startup_repo').catch(() => null);
+        const first = get().recent[0]?.path;
+        const initial = cliRepo ?? first ?? null;
+        if (initial) await get().openPath(initial);
+      } catch (e) {
+        set({ error: `初始化失败：${errMsg(e)}` });
+      }
+    },
+
+    async pickRepo() {
+      try {
+        const dir = await openDirDialog({
+          directory: true,
+          multiple: false,
+          title: '选择 Git 仓库目录',
+        });
+        if (typeof dir === 'string' && dir.length > 0) await get().openPath(dir);
+      } catch (e) {
+        set({ error: errMsg(e) });
+      }
+    },
+
+    async openPath(path) {
+      set({ busy: '打开仓库…', error: null, ...EMPTY_REPO_STATE });
+      try {
+        const repo = await openRepo(path);
+        const recent = [
+          { path: repo.path, name: repo.name, openedAt: Date.now() },
+          ...get().recent.filter((r) => r.path !== repo.path),
+        ].slice(0, MAX_RECENT);
+        saveRecent(recent);
+        set({ repo, recent, bottomPanel: 'none' });
+        await get().refresh();
+      } catch (e) {
+        set({ error: errMsg(e), repo: null });
+      } finally {
+        set({ busy: null });
+      }
+    },
+
+    closeRepo() {
+      set({ repo: null, ...EMPTY_REPO_STATE, bottomPanel: 'none' });
+    },
+
+    removeRecent(path) {
+      const recent = get().recent.filter((r) => r.path !== path);
+      saveRecent(recent);
+      set({ recent });
+    },
+
+    /** 逐个仓库读当前分支：`name (branch)` 这样显示才像 SmartGit */
+    async refreshRepoBranches() {
+      const list = get().recent.slice(0, 12);
+      const entries = await Promise.all(
+        list.map(async (r) => {
+          const res = await runGit(['rev-parse', '--abbrev-ref', 'HEAD'], {
+            cwd: r.path,
+            quiet: true,
+            timeoutMs: 8000,
+          });
+          if (res.code !== 0) return null;
+          const head = res.stdout.trim();
+          return [r.path, head && head !== 'HEAD' ? head : 'detached'] as const;
+        }),
+      );
+      const map: Record<string, string> = {};
+      for (const e of entries) if (e) map[e[0]] = e[1];
+      set({ repoBranches: map });
+    },
+
+    async refresh() {
+      const repo = get().repo;
+      if (!repo) return;
+      set({ busy: '刷新…', error: null });
+      try {
+        const [status, commits, refs, stashes, backups, ongoing, remotes] = await Promise.all([
+          getStatus(repo.path),
+          getLog(repo.path, LOG_LIMIT, get().logScope),
+          getRefs(repo.path),
+          listStashes(repo.path),
+          listBackups(repo.path),
+          getOngoingOperation(repo.path),
+          listRemotes(repo.path),
+        ]);
+        const remote =
+          remotes.find((r) => r.name === get().remote)?.name ??
+          remotes.find((r) => r.name === 'origin')?.name ??
+          remotes[0]?.name ??
+          'origin';
+        set({
+          status,
+          commits,
+          refs,
+          stashes,
+          backups,
+          ongoing,
+          remotes,
+          remote,
+          graph: layoutGraph(commits),
+        });
+
+        const current = get().selectedSha;
+        if (!current || !commits.some((c) => c.sha === current)) {
+          set({ selectedSha: commits[0]?.sha ?? null });
+        }
+
+        // 页签合法性：已消失的提交要清理掉
+        const tabs = get().commitTabs.filter((t) =>
+          t.kind === 'stash'
+            ? stashes.some((s) => `stash:${s.ref}` === t.key)
+            : commits.some((c) => c.sha === t.key),
+        );
+        let tab = get().fileTab;
+        if (tab !== 'worktree' && !tabs.some((t) => t.key === tab)) tab = 'worktree';
+        if (tabs.length !== get().commitTabs.length || tab !== get().fileTab) {
+          set({ commitTabs: tabs, fileTab: tab });
+        }
+
+        // 工作区页签：默认选中第一个改动，打开就能看到在改什么
+        if (tab === 'worktree' && get().target === null) {
+          if (status.entries.length > 0) await get().showChange(status.entries[0]);
+          else set({ selectedSha: get().selectedSha ?? commits[0]?.sha ?? null });
+        }
+      } catch (e) {
+        set({ error: errMsg(e) });
+      } finally {
+        set({ busy: null });
+      }
+    },
+
+    clearError() {
+      set({ error: null });
+    },
+
+    async openCommit(sha) {
+      const commit = get().commits.find((c) => c.sha === sha);
+      await activateTab({
+        kind: 'commit',
+        key: sha,
+        label: `提交 ${sha.slice(0, 7)}`,
+        subject: commit?.subject ?? sha.slice(0, 8),
+      });
+    },
+
+    async openStash(ref) {
+      const entry = get().stashes.find((s) => s.ref === ref);
+      await activateTab({
+        kind: 'stash',
+        key: `stash:${ref}`,
+        label: ref,
+        subject: entry?.subject ?? ref,
+      });
+    },
+
+    async closeCommitTab(key) {
+      const tabs = get().commitTabs.filter((t) => t.key !== key);
+      const wasActive = get().fileTab === key;
+      set({ commitTabs: tabs });
+      if (!wasActive) return;
+      const next = tabs[tabs.length - 1];
+      if (next) await get().setFileTab(next.key);
+      else await get().setFileTab('worktree');
+    },
+
+    async setFileTab(key) {
+      if (key === 'worktree') {
+        set({ fileTab: 'worktree' });
+        const entry = get().status?.entries[0];
+        if (entry) await get().showChange(entry);
+        else
+          set({
+            target: null,
+            patches: [],
+            worktreePatches: [],
+            stagedPatches: [],
+            conflictSides: null,
+            selection: new Set<string>(),
+          });
+        return;
+      }
+      const tab = get().commitTabs.find((t) => t.key === key);
+      if (!tab) return;
+      if (tab.kind === 'stash') await get().openStash(stashRefOfKey(key));
+      else await get().openCommit(key);
+    },
+
+    setLogScope(scope) {
+      set({ logScope: scope });
+      void get().refresh();
+    },
+
+    openDiffModal() {
+      if (get().target) set({ diffModal: true });
+    },
+
+    closeDiffModal() {
+      set({ diffModal: false });
+    },
+
+    setTheme(theme) {
+      set({ theme });
+      applyTheme(theme);
+      void syncWindowTheme(theme);
+    },
+
+    async showTabFile(file) {
+      const repo = get().repo;
+      if (!repo) return;
+      const tab = get().commitTabs.find((t) => t.key === get().fileTab);
+      if (!tab) return;
+      const isStash = tab.kind === 'stash';
+      const ref = stashRefOfKey(tab.key);
+      set({
+        target: isStash
+          ? { kind: 'stash', ref, path: file.path }
+          : { kind: 'commit', sha: tab.key, path: file.path },
+        patches: [],
+        worktreePatches: [],
+        stagedPatches: [],
+        selection: new Set<string>(),
+        diffLoading: true,
+      });
+      try {
+        const patches = isStash
+          ? await stashFileDiff(repo.path, ref, file.path)
+          : await getCommitDiff(repo.path, tab.key, file.path);
+        set({ patches, worktreePatches: patches });
+      } catch (e) {
+        set({ error: errMsg(e) });
+      } finally {
+        set({ diffLoading: false });
+      }
+    },
+
+    async showChange(entry) {
+      const repo = get().repo;
+      if (!repo) return;
+      if (get().fileTab !== 'worktree') set({ fileTab: 'worktree' });
+      if (entry.kind === 'unmerged') {
+        set({
+          target: { kind: 'file', path: entry.path },
+          conflictSides: null,
+          decisions: {},
+          worktreePatches: [],
+          stagedPatches: [],
+          patches: [],
+          selection: new Set<string>(),
+          diffLoading: true,
+        });
+        try {
+          const sides = await loadConflictSides(repo.path, entry.path);
+          set({ conflictSides: sides });
+        } catch (e) {
+          set({ error: errMsg(e) });
+        } finally {
+          set({ diffLoading: false });
+        }
+        return;
+      }
+      await loadFileDiff(entry, true);
+    },
+
+    setSide(side) {
+      const { worktreePatches, stagedPatches } = get();
+      set({
+        side,
+        patches: side === 'staged' ? stagedPatches : worktreePatches,
+        selection: new Set<string>(),
+      });
+    },
+
+    toggleKeys(keys) {
+      if (keys.length === 0) return;
+      const next = new Set(get().selection);
+      const allIn = keys.every((k) => next.has(k));
+      for (const k of keys) {
+        if (allIn) next.delete(k);
+        else next.add(k);
+      }
+      set({ selection: next });
+    },
+
+    clearSelection() {
+      set({ selection: new Set<string>() });
+    },
+
+    async stageSelection() {
+      const { patches, selection, side } = get();
+      const { patch, count } = buildSelectedPatch(patches, selection, side);
+      if (count === 0) return;
+      await mutate(`暂存 ${count} 行`, false, () => applyPatchToIndex(getRepoPath(), patch, false));
+    },
+
+    async unstageSelection() {
+      const { patches, selection, side } = get();
+      const { patch, count } = buildSelectedPatch(patches, selection, side);
+      if (count === 0) return;
+      await mutate(`取消暂存 ${count} 行`, false, () =>
+        applyPatchToIndex(getRepoPath(), patch, true),
+      );
+    },
+
+    async discardSelection() {
+      const { patches, selection, side } = get();
+      const { patch, count } = buildSelectedPatch(patches, selection, side);
+      if (count === 0) return;
+      const ok = await confirmBox({
+        title: `丢弃 ${count} 行改动？`,
+        body: '这些改动会从工作区移除。操作前会自动创建备份（侧栏「备份」可恢复）。',
+        okText: '丢弃',
+        danger: true,
+      });
+      if (!ok) return;
+      await mutate('丢弃改动', true, () => applyPatchToWorktree(getRepoPath(), patch, true));
+    },
+
+    async stageEntry(entry) {
+      await mutate(`暂存 ${entry.path}`, false, () => stageFile(getRepoPath(), entry.path));
+    },
+
+    async unstageEntry(entry) {
+      await mutate(`取消暂存 ${entry.path}`, false, () => unstageFile(getRepoPath(), entry.path));
+    },
+
+    async discardEntry(entry) {
+      const isUntracked = entry.kind === 'untracked';
+      const ok = await confirmBox({
+        title: isUntracked ? `删除未跟踪文件「${entry.path}」？` : `丢弃「${entry.path}」的改动？`,
+        body: isUntracked
+          ? '文件会被直接删除，不进回收站。'
+          : '工作区改动会丢失（暂存区内容保留）。操作前会自动创建备份。',
+        okText: '丢弃',
+        danger: true,
+      });
+      if (!ok) return;
+      await mutate('丢弃文件改动', !isUntracked, () =>
+        discardFileChanges(getRepoPath(), entry.path, isUntracked),
+      );
+    },
+
+    async stageAllOp() {
+      await mutate('暂存全部', false, () => stageAll(getRepoPath()));
+    },
+
+    async unstageAllOp() {
+      await mutate('取消暂存全部', false, () => unstageAll(getRepoPath()));
+    },
+
+    setDecision(blockId, decision) {
+      set({ decisions: { ...get().decisions, [blockId]: decision } });
+    },
+
+    decideAll(decision) {
+      const sides = get().conflictSides;
+      if (!sides) return;
+      const parsed = parseConflictFile(sides.merged);
+      const next: Record<number, Decision> = {};
+      for (const c of parsed.conflicts) next[c.id] = decision;
+      set({ decisions: next });
+    },
+
+    async applyResolved() {
+      const repo = get().repo;
+      const target = get().target;
+      const sides = get().conflictSides;
+      if (!repo || !target || !sides) return;
+
+      const parsed = parseConflictFile(sides.merged);
+      const open = undecidedCount(parsed, get().decisions);
+      if (open > 0) {
+        set({ error: `还有 ${open} 个冲突块没有处理。` });
+        return;
+      }
+      const content =
+        parsed.conflicts.length > 0 ? resolveConflict(parsed, get().decisions) : sides.merged;
+      await mutate('写入解决结果', true, async () => {
+        await writeResolvedFile(repo.path, target.path, content);
+        await markResolved(repo.path, target.path);
+      });
+      set({ conflictSides: null, decisions: {} });
+    },
+
+    async checkoutSideOp(path, side) {
+      const ok = await confirmBox({
+        title: `整文件采用${side === 'ours' ? '我方' : '对方'}？`,
+        body: '会丢弃该文件另一侧的修改，并直接标记为已解决。',
+        okText: '采用',
+        danger: true,
+      });
+      if (!ok) return;
+      await mutate('采用一侧', true, () => checkoutSide(getRepoPath(), path, side));
+      set({ conflictSides: null, decisions: {} });
+    },
+
+    async abortMergeOp() {
+      const ok = await confirmBox({
+        title: '中止这次合并？',
+        body: '会回到合并前的状态，本次冲突处理全部丢弃。',
+        okText: '中止合并',
+        danger: true,
+      });
+      if (!ok) return;
+      await mutate('中止合并', false, async () => {
+        const res = await abortMerge(getRepoPath());
+        if (res.code !== 0) throw new Error(res.stderr.trim() || 'merge --abort 失败');
+      });
+      set({ conflictSides: null, decisions: {} });
+    },
+
+    async lastCommitMessage() {
+      const repo = get().repo;
+      if (!repo) return '';
+      return getLastCommitMessage(repo.path);
+    },
+
+    async doCommit(opts) {
+      const repo = get().repo;
+      if (!repo) return false;
+      set({ busy: opts.amend ? '修正提交…' : '提交…', error: null });
+      try {
+        const res = await createCommit(repo.path, opts);
+        if (res.code !== 0) {
+          set({ error: (res.stderr || res.stdout).trim() || `git commit 退出码 ${res.code}` });
+          return false;
+        }
+        set({ bottomPanel: 'none' });
+        await get().refresh();
+        return true;
+      } catch (e) {
+        set({ error: errMsg(e) });
+        return false;
+      } finally {
+        set({ busy: null });
+      }
+    },
+
+    setBottomPanel(p) {
+      set({ bottomPanel: get().bottomPanel === p ? 'none' : p });
+    },
+
+    async createBranchOp(name) {
+      await mutate(`创建分支 ${name}`, false, async () => {
+        const res = await createBranch(getRepoPath(), name);
+        if (res.code !== 0) throw new Error(res.stderr.trim() || '创建分支失败');
+      });
+    },
+
+    async switchBranchOp(name) {
+      await mutate(`切换到 ${name}`, false, async () => {
+        const res = await switchBranch(getRepoPath(), name);
+        if (res.code !== 0) throw new Error(res.stderr.trim() || '切换分支失败');
+      });
+    },
+
+    async createTrackingBranchOp(localName, remoteRef) {
+      await mutate(`检出 ${localName}`, false, async () => {
+        const res = await createTrackingBranch(getRepoPath(), localName, remoteRef);
+        if (res.code !== 0) throw new Error(res.stderr.trim() || '创建跟踪分支失败');
+      });
+    },
+
+    async deleteBranchOp(name) {
+      const ok = await confirmBox({
+        title: `删除分支「${name}」？`,
+        body: '未合并的分支会被 git 拒绝删除。',
+        okText: '删除',
+        danger: true,
+      });
+      if (!ok) return;
+      await mutate(`删除分支 ${name}`, false, async () => {
+        const res = await deleteBranch(getRepoPath(), name);
+        if (res.code !== 0) throw new Error(res.stderr.trim() || '删除分支失败');
+      });
+    },
+
+    async mergeBranchOp(name) {
+      await mutate(`合并 ${name}`, true, async () => {
+        const res = await mergeBranch(getRepoPath(), name);
+        if (res.code !== 0) {
+          const msg = res.stderr.trim() || res.stdout.trim();
+          // 冲突不算失败，提示去解决
+          if (/conflict/i.test(msg)) {
+            await get().refresh();
+            throw new Error(`${msg}\n\n有冲突，请在「变更」里逐个解决。`);
+          }
+          throw new Error(msg || '合并失败');
+        }
+      });
+    },
+
+    async rebaseOntoOp(name) {
+      const ok = await confirmBox({
+        title: `把当前分支变基到「${name}」？`,
+        body: '会重写当前分支的提交哈希。冲突时需要逐个解决后执行 git rebase --continue。',
+        okText: '变基',
+        danger: true,
+      });
+      if (!ok) return;
+      await mutate(`变基到 ${name}`, true, async () => {
+        const res = await rebaseOnto(getRepoPath(), name);
+        if (res.code !== 0) {
+          const msg = res.stderr.trim() || res.stdout.trim();
+          if (/conflict/i.test(msg)) {
+            await get().refresh();
+            throw new Error(`${msg}\n\n有冲突，解决后需要手动执行 git rebase --continue。`);
+          }
+          throw new Error(msg || '变基失败');
+        }
+      });
+    },
+
+    async stashSaveOp(message) {
+      await mutate('保存 stash', false, async () => {
+        const res = await saveStash(getRepoPath(), message);
+        if (res.code !== 0) throw new Error(res.stderr.trim() || 'stash 失败');
+      });
+    },
+
+    async stashApplyOp(ref, drop) {
+      await mutate(drop ? `pop ${ref}` : `应用 ${ref}`, true, async () => {
+        const res = await applyStash(getRepoPath(), ref, drop);
+        if (res.code !== 0) throw new Error(res.stderr.trim() || 'stash 应用失败');
+      });
+    },
+
+    async stashDropOp(ref) {
+      const ok = await confirmBox({
+        title: `删除 ${ref}？`,
+        body: 'stash 删除后只能靠 reflog 找回。',
+        okText: '删除',
+        danger: true,
+      });
+      if (!ok) return;
+      await mutate(`删除 ${ref}`, false, async () => {
+        const res = await dropStash(getRepoPath(), ref);
+        if (res.code !== 0) throw new Error(res.stderr.trim() || '删除 stash 失败');
+      });
+    },
+
+    async createTagOp(name, message) {
+      await mutate(`创建标签 ${name}`, false, async () => {
+        const res = await createTag(getRepoPath(), name, message);
+        if (res.code !== 0) throw new Error(res.stderr.trim() || '创建标签失败');
+      });
+    },
+
+    async deleteTagOp(name) {
+      const ok = await confirmBox({ title: `删除标签「${name}」？`, okText: '删除', danger: true });
+      if (!ok) return;
+      await mutate(`删除标签 ${name}`, false, async () => {
+        const res = await deleteTag(getRepoPath(), name);
+        if (res.code !== 0) throw new Error(res.stderr.trim() || '删除标签失败');
+      });
+    },
+
+    async restoreBackupOp(sha) {
+      const ok = await confirmBox({
+        title: '恢复这份备份？',
+        body: '会把备份里的工作区与暂存区内容重新应用回来。',
+        okText: '恢复',
+        danger: true,
+      });
+      if (!ok) return;
+      await mutate('恢复备份', false, async () => {
+        const res = await restoreBackup(getRepoPath(), sha);
+        if (res.code !== 0) throw new Error(res.stderr.trim() || '恢复备份失败');
+      });
+    },
+
+    setRemote(name) {
+      set({ remote: name });
+    },
+
+    async fetchOp() {
+      const remote = get().remote;
+      set({ busy: `获取 ${remote}…`, error: null });
+      try {
+        const res = await fetchRemote(getRepoPath(), remote);
+        if (res.code !== 0) {
+          set({ error: humanizeRemoteError(res.stderr || res.stdout) });
+          return;
+        }
+        await reload();
+      } catch (e) {
+        set({ error: errMsg(e) });
+      } finally {
+        set({ busy: null });
+      }
+    },
+
+    async pullOp(strategy) {
+      await mutate(`拉取（${strategy}）`, true, async () => {
+        const res = await pullRemote(getRepoPath(), strategy);
+        if (res.code !== 0) throw new Error(humanizeRemoteError(res.stderr || res.stdout));
+      });
+    },
+
+    async pushOp(force) {
+      const status = get().status;
+      const branch = status?.branch.head ?? null;
+      if (!branch) {
+        set({ error: '当前是 detached HEAD，无法推送。请先切到一个分支。' });
+        return;
+      }
+      if (force) {
+        const ok = await confirmBox({
+          title: `强制推送 ${branch}？`,
+          body: '使用 --force-with-lease：远端在你上次拉取后若被别人更新过会被拒绝。',
+          okText: '强制推送',
+          danger: true,
+        });
+        if (!ok) return;
+      }
+      const remote = get().remote;
+      const setUpstream = !status?.branch.upstream;
+      set({ busy: `推送 ${branch} → ${remote}…`, error: null });
+      try {
+        const res = await pushRemote(getRepoPath(), { remote, branch, force, setUpstream });
+        if (res.code !== 0) {
+          set({ error: humanizeRemoteError(res.stderr || res.stdout) });
+          return;
+        }
+        await reload();
+      } catch (e) {
+        set({ error: errMsg(e) });
+      } finally {
+        set({ busy: null });
+      }
+    },
+  };
+});
+
+/** 暂存/未暂存条目数（给工具栏和面板显示） */
+export function countEntries(s: RepoStatus | null): { total: number; staged: number; worktree: number } {
+  if (!s) return { total: 0, staged: 0, worktree: 0 };
+  let staged = 0;
+  let worktree = 0;
+  for (const e of s.entries) {
+    if (hasStaged(e)) staged += 1;
+    if (hasWorktree(e)) worktree += 1;
+  }
+  return { total: s.entries.length, staged, worktree };
+}
+
+export { hasWorktree, hasStaged };

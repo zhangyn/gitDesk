@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "GitDesk 主窗口的最小权限集",
+  "windows": ["main"],
+  "permissions": ["core:default", "core:window:allow-set-theme", "dialog:default"]
+}

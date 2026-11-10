@@ -1,0 +1,11 @@
+# 统一换行符，避免 Windows 上提交出 CRLF 噪音
+* text=auto eol=lf
+
+# Windows 批处理必须是 CRLF，否则 cmd 解析会出错
+*.bat text eol=crlf
+
+# 二进制
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
