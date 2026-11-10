@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { hasStaged, hasWorktree, useStore } from '../store';
 import type { Side } from '../types';
 import { DiffView, type DiffMode } from './DiffView';
 import { DiffActions } from './DiffActions';
 import { ConflictEditor } from './ConflictEditor';
 import { IconSplit, IconUnified } from '../ui/icons';
+import { HunkNav, useHunkNav } from '../ui/HunkNav';
 
 const MODE_KEY = 'gitdesk.diffMode';
 const DATE_FMT = new Intl.DateTimeFormat('zh-CN', {
@@ -28,31 +29,6 @@ function useDiffMode(): [DiffMode, (m: DiffMode) => void] {
 function sidesLabel(kind: 'commit' | 'file', side: Side, hasParent: boolean): string {
   if (kind === 'commit') return hasParent ? '父提交 ↔ 本次提交' : '空 ↔ 本次提交';
   return side === 'staged' ? 'HEAD ↔ 暂存区' : '暂存区 ↔ 工作区';
-}
-
-function HunkNav({
-  count,
-  index,
-  onGo,
-}: {
-  count: number;
-  index: number;
-  onGo: (delta: number) => void;
-}) {
-  if (count === 0) return null;
-  return (
-    <span className="hunk-nav">
-      <span className="hunk-nav-count">
-        {Math.min(index + 1, count)}/{count}
-      </span>
-      <button className="icon-btn" title="上一个差异块" onClick={() => onGo(-1)}>
-        ↑
-      </button>
-      <button className="icon-btn" title="下一个差异块" onClick={() => onGo(1)}>
-        ↓
-      </button>
-    </span>
-  );
 }
 
 function WordToggle() {
@@ -108,27 +84,15 @@ export function DetailPanel() {
   const cherryPickOp = useStore((s) => s.cherryPickOp);
   const revertOp = useStore((s) => s.revertOp);
 
-  const diffRef = useRef<HTMLDivElement>(null);
-  const [hunkIdx, setHunkIdx] = useState(0);
   const hunkCount = useMemo(
     () => patches.reduce((n, p) => n + p.hunks.length, 0),
     [patches],
   );
-
-  // 换文件/换提交时回到第一个差异块
-  useEffect(() => {
-    setHunkIdx(0);
-  }, [patches]);
-
-  const goHunk = (delta: number) => {
-    const root = diffRef.current;
-    if (!root) return;
-    const heads = root.querySelectorAll<HTMLElement>('.hunk-head');
-    if (heads.length === 0) return;
-    const next = Math.max(0, Math.min(heads.length - 1, hunkIdx + delta));
-    setHunkIdx(next);
-    heads[next].scrollIntoView({ block: 'center', behavior: 'smooth' });
-  };
+  // 中间面板与双击弹窗共用同一套导航；换文件/换提交就回到第 1 块
+  const nav = useHunkNav(
+    hunkCount,
+    `${target?.kind ?? ''}:${target?.path ?? ''}:${target?.sha ?? ''}:${target?.ref ?? ''}`,
+  );
 
   const commit = useMemo(
     () => commits.find((c) => c.sha === selectedSha) ?? null,
@@ -206,7 +170,7 @@ export function DetailPanel() {
             >
               还原
             </button>
-            <HunkNav count={hunkCount} index={hunkIdx} onGo={goHunk} />
+            <HunkNav count={hunkCount} index={nav.index} onGo={nav.go} />
             <WordToggle />
             <ModeToggle mode={mode} onChange={setMode} />
           </div>
@@ -243,7 +207,7 @@ export function DetailPanel() {
             </>
           )}
           <span className="spacer" />
-          {!isConflict && <HunkNav count={hunkCount} index={hunkIdx} onGo={goHunk} />}
+          {!isConflict && <HunkNav count={hunkCount} index={nav.index} onGo={nav.go} />}
           {!isConflict && <WordToggle />}
           {!isConflict && <ModeToggle mode={mode} onChange={setMode} />}
         </div>
@@ -261,7 +225,7 @@ export function DetailPanel() {
           interactive={!isCommitView && !isStashView && !isCompareView}
           side={side}
           mode={mode}
-          containerRef={diffRef}
+          containerRef={nav.containerRef}
           emptyText={
             !isCommitView && !isStashView && !isCompareView && side === 'staged'
               ? '这个文件没有已暂存的内容'

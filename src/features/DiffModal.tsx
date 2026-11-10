@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useStore } from '../store';
 import { DiffView, type DiffMode } from './DiffView';
 import { DiffActions } from './DiffActions';
 import { IconSplit, IconUnified } from '../ui/icons';
+import { HunkNav, useHunkNav } from '../ui/HunkNav';
 
 /**
  * 双击文件后的大窗 diff。
@@ -17,14 +18,37 @@ export function DiffModal() {
   const loading = useStore((s) => s.diffLoading);
   const conflictSides = useStore((s) => s.conflictSides);
 
+  const hunkCount = useMemo(
+    () => patches.reduce((n, p) => n + p.hunks.length, 0),
+    [patches],
+  );
+  // 和中间面板共用同一套差异块导航；换文件/换提交自动回到第 1 块
+  const nav = useHunkNav(
+    open ? hunkCount : 0,
+    `${target?.kind ?? ''}:${target?.path ?? ''}:${target?.sha ?? ''}:${target?.ref ?? ''}`,
+  );
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close();
+      // 大窗里直接按 n / p 也能翻差异块，不用去点按钮
+      if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey) {
+        const tag = (e.target as HTMLElement | null)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        e.preventDefault();
+        nav.go(1);
+      }
+      if ((e.key === 'p' || e.key === 'P') && !e.ctrlKey && !e.metaKey) {
+        const tag = (e.target as HTMLElement | null)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        e.preventDefault();
+        nav.go(-1);
+      }
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [open, close]);
+  }, [open, close, nav]);
 
   if (!open || !target) return null;
 
@@ -59,7 +83,8 @@ export function DiffModal() {
                   : '暂存区 ↔ 工作区'}
           </span>
           <span className="spacer" />
-          <span className="hint">Esc 关闭</span>
+          <HunkNav count={hunkCount} index={nav.index} onGo={nav.go} />
+          <span className="hint">n/p 翻差异 · Esc 关闭</span>
           <button className="icon-btn" title="关闭" onClick={close}>
             ✕
           </button>
@@ -74,6 +99,7 @@ export function DiffModal() {
           interactive={interactive}
           side={side}
           mode={mode}
+          containerRef={nav.containerRef}
         />
 
         <div className="diff-modal-foot">
