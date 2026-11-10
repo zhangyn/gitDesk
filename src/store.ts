@@ -219,6 +219,9 @@ interface AppStore {
   /** 提交历史搜索（null = 不过滤） */
   logQuery: LogSearch | null;
   logSearching: boolean;
+  /** 行内差异高亮开关 */
+  wordDiff: boolean;
+  toggleWordDiff: () => void;
   /** 当前加载深度（每次「加载更多」+LOG_PAGE） */
   logLimit: number;
   loadMoreLog: () => Promise<void>;
@@ -338,6 +341,7 @@ const EMPTY_REPO_STATE = {
   logQuery: null,
   logSearching: false,
   logLimit: LOG_PAGE,
+  wordDiff: localStorage.getItem('gitdesk.wordDiff') !== '0',
   compareInfo: null,
   stagedStat: null,
   commitTabs: [] as CommitTab[],
@@ -774,6 +778,7 @@ export const useStore = create<AppStore>()((set, get) => {
         logQuery: text.trim() ? { mode, text } : null,
         logSearching: Boolean(text.trim()),
         logLimit: LOG_PAGE,
+  wordDiff: localStorage.getItem('gitdesk.wordDiff') !== '0',
       });
       void get().refresh();
     },
@@ -781,6 +786,12 @@ export const useStore = create<AppStore>()((set, get) => {
     clearLogQuery() {
       set({ logQuery: null, logSearching: false, logLimit: LOG_PAGE });
       void get().refresh();
+    },
+
+    toggleWordDiff() {
+      const next = !get().wordDiff;
+      localStorage.setItem('gitdesk.wordDiff', next ? '1' : '0');
+      set({ wordDiff: next });
     },
 
     /** 加载下一页：加大深度后整段重取（几千行的解析是毫秒级，比增量拼接更不容易错） */

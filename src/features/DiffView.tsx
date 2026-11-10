@@ -1,7 +1,8 @@
-import type { RefObject } from 'react';
+import { useMemo, type RefObject } from 'react';
 import type { DiffLine, DiffHunk, FilePatch, Side } from '../types';
 import { useStore } from '../store';
 import { hunkKeys, isSelectable, lineKey } from '../patch/build';
+import { buildWordMap, type Segment } from '../patch/word';
 
 export type DiffMode = 'split' | 'unified';
 
@@ -75,6 +76,23 @@ function GapRow({ lines }: { lines: number }) {
   );
 }
 
+/** 行内差异：只把变化的那几个片段加重 */
+function Segments({ segs }: { segs: Segment[] }) {
+  return (
+    <>
+      {segs.map((seg, i) =>
+        seg.changed ? (
+          <span className="wd" key={i}>
+            {seg.text}
+          </span>
+        ) : (
+          <span key={i}>{seg.text}</span>
+        ),
+      )}
+    </>
+  );
+}
+
 function cellClass(cell: Cell | undefined, selectable: boolean, isSel: boolean): string {
   if (!cell) return 'dsp-cell empty';
   const kind = cell.line.kind;
@@ -94,9 +112,11 @@ function SplitView({
 }) {
   const selection = useStore((s) => s.selection);
   const toggleKeys = useStore((s) => s.toggleKeys);
+  const wordMode = useStore((s) => s.wordDiff);
 
   const cell = (c: Cell | undefined, which: 'old' | 'new', hi: number) => {
     if (!c) return <div className="dsp-cell empty" />;
+    const segs = wordMode ? wordMaps.get(hi)?.get(c.index) : undefined;
     const selectable = interactive && isSelectable(c.line.kind);
     const key = lineKey(pi, hi, c.index, side);
     const sel = selectable && selection.has(key);
@@ -111,11 +131,28 @@ function SplitView({
         <span className="ln">{no ?? ''}</span>
         <span className="sign">{sign(c.line.kind)}</span>
         <span className="txt" title={c.line.text}>
-          {c.line.text.length > 0 ? c.line.text : '\u00a0'}
+          {segs ? (
+            segs.length > 0 ? (
+              <Segments segs={segs} />
+            ) : (
+              '\u00a0'
+            )
+          ) : c.line.text.length > 0 ? (
+            c.line.text
+          ) : (
+            '\u00a0'
+          )}
         </span>
       </div>
     );
   };
+
+  const wordMaps = useMemo(() => {
+    const m = new Map<number, Map<number, Segment[]>>();
+    if (!wordMode) return m;
+    patch.hunks.forEach((h, hi) => m.set(hi, buildWordMap(h)));
+    return m;
+  }, [patch, wordMode]);
 
   return (
     <>
@@ -181,6 +218,14 @@ function UnifiedView({
 }) {
   const selection = useStore((s) => s.selection);
   const toggleKeys = useStore((s) => s.toggleKeys);
+  const wordMode = useStore((s) => s.wordDiff);
+
+  const wordMaps = useMemo(() => {
+    const m = new Map<number, Map<number, Segment[]>>();
+    if (!wordMode) return m;
+    patch.hunks.forEach((h, hi) => m.set(hi, buildWordMap(h)));
+    return m;
+  }, [patch, wordMode]);
 
   return (
     <>
@@ -226,7 +271,13 @@ function UnifiedView({
                   <span className="ln">{line.oldNo ?? ''}</span>
                   <span className="ln">{line.newNo ?? ''}</span>
                   <span className="sign">{sign(line.kind)}</span>
-                  <span className="txt">{line.text.length > 0 ? line.text : '\u00a0'}</span>
+                  <span className="txt">
+                    {(() => {
+                      const segs = wordMaps.get(hi)?.get(li);
+                      if (!segs) return line.text.length > 0 ? line.text : '\u00a0';
+                      return segs.length > 0 ? <Segments segs={segs} /> : '\u00a0';
+                    })()}
+                  </span>
                 </div>
               );
             })}

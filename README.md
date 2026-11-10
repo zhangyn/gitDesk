@@ -37,6 +37,7 @@
 - **提交历史分页**：一次 400 条，滚到底自动续，几千条的仓库也能一路翻下去（画布按视口绘制，不受 canvas 高度上限限制）
 - 分栏 diff（左＝原内容，右＝修改后），可切统一视图；标题标明两侧语义（暂存区 ↔ 工作区 / HEAD ↔ 暂存区 / 父提交 ↔ 本次提交）
 - 差异块导航（`n/2` + 上下跳）、hunk 之间折叠成「⋯ N 行未改动 ⋯」
+- **行内差异高亮**：改一个变量名时只高亮变的那个词（LCS 逐词比较，纯空白变化不点亮），可开关
 - 双击文件行弹出**全屏 diff**，大改动也能看全
 - 文件区带页签：工作区 + 每个点开的历史提交 / Stash 各占一个页签
 
@@ -155,6 +156,7 @@ npm run verify     # 154/154
 | `verify-staging.ts` | 43 | 行级暂存：选行 → 重建 patch → `git apply --cached` → **断言 index 里的精确内容** |
 | `verify-remote.ts` | 25 | 本地 bare 当 origin：push -u / `pull --ff-only` 拒绝分叉 / lease 过期拒绝 / rebase 后历史线性 |
 | `verify-conflict.ts` | 40 | 真实冲突逐块决策 → 合成内容；diff3 基线段、空侧、无尾换行、`=======` 误判 |
+| `verify-word.ts` | 23 | 行内差异：变量名/中文/纯缩进/超长行/配对规则 |
 | `verify-compare.ts` | 25 | 分支/提交对比的文件列表与统计、说明搜索、文件搜索（含"只在未合并分支上"的回归断言） |
 
 这套验证抓到过会**写坏用户 index** 的真 bug：
@@ -184,7 +186,7 @@ npm install
 npm run icons      # 生成 src-tauri/icons/*（零依赖，node 内置 zlib）
 npm run app:dev    # tauri dev：vite + cargo
 npm run typecheck  # tsc --noEmit
-npm run verify     # 154 项端到端断言
+npm run verify     # 202 项断言
 ```
 
 打包：

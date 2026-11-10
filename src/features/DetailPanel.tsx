@@ -55,6 +55,20 @@ function HunkNav({
   );
 }
 
+function WordToggle() {
+  const wordDiff = useStore((s) => s.wordDiff);
+  const toggle = useStore((s) => s.toggleWordDiff);
+  return (
+    <button
+      className={`btn small word-toggle${wordDiff ? ' is-on' : ''}`}
+      title={wordDiff ? '行内差异高亮：开（点击关闭）' : '行内差异高亮：关（点击开启）'}
+      onClick={toggle}
+    >
+      行内
+    </button>
+  );
+}
+
 function ModeToggle({ mode, onChange }: { mode: DiffMode; onChange: (m: DiffMode) => void }) {
   return (
     <div className="mode-toggle">
@@ -89,6 +103,8 @@ export function DetailPanel() {
   const conflictSides = useStore((s) => s.conflictSides);
   const status = useStore((s) => s.status);
   const [mode, setMode] = useDiffMode();
+  const wordDiff = useStore((s) => s.wordDiff);
+  const toggleWordDiff = useStore((s) => s.toggleWordDiff);
   const cherryPickOp = useStore((s) => s.cherryPickOp);
   const revertOp = useStore((s) => s.revertOp);
 
@@ -191,6 +207,7 @@ export function DetailPanel() {
               还原
             </button>
             <HunkNav count={hunkCount} index={hunkIdx} onGo={goHunk} />
+            <WordToggle />
             <ModeToggle mode={mode} onChange={setMode} />
           </div>
 
@@ -227,6 +244,7 @@ export function DetailPanel() {
           )}
           <span className="spacer" />
           {!isConflict && <HunkNav count={hunkCount} index={hunkIdx} onGo={goHunk} />}
+          {!isConflict && <WordToggle />}
           {!isConflict && <ModeToggle mode={mode} onChange={setMode} />}
         </div>
       )}
