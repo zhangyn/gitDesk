@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import type { DiffLine, DiffHunk, FilePatch, Side } from '../types';
 import { useStore } from '../store';
 import { hunkKeys, isSelectable, lineKey } from '../patch/build';
@@ -59,6 +60,21 @@ function toSplitRows(hunk: DiffHunk): SplitRow[] {
   return rows;
 }
 
+/** 两个 hunk 之间被折叠掉的行数（git 只给 ±3 行上下文，中间往往隔着几十行） */
+function gapBefore(prev: DiffHunk | undefined, cur: DiffHunk): number {
+  if (!prev) return 0;
+  return cur.oldStart - (prev.oldStart + prev.oldLines);
+}
+
+function GapRow({ lines }: { lines: number }) {
+  if (lines <= 0) return null;
+  return (
+    <div className="hunk-gap">
+      <span>⋯ {lines} 行未改动 ⋯</span>
+    </div>
+  );
+}
+
 function cellClass(cell: Cell | undefined, selectable: boolean, isSel: boolean): string {
   if (!cell) return 'dsp-cell empty';
   const kind = cell.line.kind;
@@ -113,6 +129,7 @@ function SplitView({
 
         return (
           <div className="hunk" key={hi}>
+            <GapRow lines={gapBefore(patch.hunks[hi - 1], hunk)} />
             <div
               className={`hunk-head${interactive && keys.length > 0 ? ' interactive' : ''}${
                 allSel ? ' is-sel' : someSel ? ' is-partial' : ''
@@ -175,6 +192,7 @@ function UnifiedView({
 
         return (
           <div className="hunk" key={hi}>
+            <GapRow lines={gapBefore(patch.hunks[hi - 1], hunk)} />
             <div
               className={`hunk-head${interactive && keys.length > 0 ? ' interactive' : ''}${
                 allSel ? ' is-sel' : someSel ? ' is-partial' : ''
@@ -227,6 +245,7 @@ export function DiffView({
   side,
   mode,
   emptyText,
+  containerRef,
 }: {
   patches: FilePatch[];
   loading: boolean;
@@ -235,13 +254,14 @@ export function DiffView({
   side: Side;
   mode: DiffMode;
   emptyText?: string;
+  containerRef?: RefObject<HTMLDivElement>;
 }) {
   if (loading) return <div className="diff-empty">加载中…</div>;
   if (!hasTarget) return <div className="diff-empty">选择左侧的提交或文件查看差异</div>;
   if (patches.length === 0) return <div className="diff-empty">{emptyText ?? '没有可显示的差异'}</div>;
 
   return (
-    <div className={`diff${mode === 'split' ? ' is-split' : ''}`}>
+    <div className={`diff${mode === 'split' ? ' is-split' : ''}`} ref={containerRef}>
       {patches.map((p, pi) => (
         <div className="diff-file" key={`${p.newPath}-${pi}`}>
           {/* 只有一个文件时，路径已经在面板标题里了，不要再重复一遍 */}

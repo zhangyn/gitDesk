@@ -43,6 +43,7 @@ import {
 } from './git/ops/indexOps';
 import { createCommit, getLastCommitMessage, type CommitOptions } from './git/ops/commit';
 import {
+  cherryPick,
   cherryPickAbort,
   cherryPickContinue,
   createBranch,
@@ -55,6 +56,7 @@ import {
   rebaseOnto,
   rebaseSkip,
   revertAbort,
+  revertCommit,
   revertContinue,
   switchBranch,
 } from './git/ops/branch';
@@ -283,6 +285,10 @@ interface AppStore {
   checkoutSideOp: (path: string, side: 'ours' | 'theirs') => Promise<void>;
   abortMergeOp: () => Promise<void>;
   /** 中断后的后续动作：rebase / cherry-pick / revert */
+  /** 把某个提交拣选到当前分支（-x 不记录来源，保持简单） */
+  cherryPickOp: (sha: string) => Promise<void>;
+  /** 生成反向提交 */
+  revertOp: (sha: string) => Promise<void>;
   continueOp: () => Promise<void>;
   skipOp: () => Promise<void>;
   abortOp: () => Promise<void>;
@@ -1068,6 +1074,41 @@ export const useStore = create<AppStore>()((set, get) => {
         if (res.code !== 0) throw new Error(res.stderr.trim() || 'merge --abort 失败');
       });
       set({ conflictSides: null, decisions: {} });
+    },
+
+    async cherryPickOp(sha) {
+      await mutate('拣选提交', true, async () => {
+        const res = await cherryPick(getRepoPath(), sha);
+        if (res.code !== 0) {
+          const msg = res.stderr.trim() || res.stdout.trim();
+          if (/conflict/i.test(msg)) {
+            await get().refresh();
+            throw new Error(`${msg}\n\n有冲突，请在「变更」里解决后点顶部的「继续」。`);
+          }
+          throw new Error(msg || '拣选失败');
+        }
+      });
+    },
+
+    async revertOp(sha) {
+      const ok = await confirmBox({
+        title: `还原提交 ${sha.slice(0, 7)}？`,
+        body: '会生成一个新的「反向提交」来抵消它的改动，不改写已有历史。',
+        okText: '还原',
+        danger: true,
+      });
+      if (!ok) return;
+      await mutate('还原提交', true, async () => {
+        const res = await revertCommit(getRepoPath(), sha);
+        if (res.code !== 0) {
+          const msg = res.stderr.trim() || res.stdout.trim();
+          if (/conflict/i.test(msg)) {
+            await get().refresh();
+            throw new Error(`${msg}\n\n有冲突，请在「变更」里解决后点顶部的「继续」。`);
+          }
+          throw new Error(msg || '还原失败');
+        }
+      });
     },
 
     async continueOp() {

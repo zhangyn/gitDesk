@@ -1,5 +1,7 @@
 # GitDesk
 
+[![CI](https://github.com/zhangyn/gitDesk/actions/workflows/ci.yml/badge.svg)](https://github.com/zhangyn/gitDesk/actions/workflows/ci.yml)
+
 > 轻量 Git 图形客户端 · Windows · Tauri 2 + React + TypeScript
 
 不背 Chromium，不重写 Git。安装包 **1.21 MiB**，exe **3.2 MB**，空闲内存 **~65 MB**。
@@ -33,6 +35,7 @@
 - **任意两个版本对比**：分支↔分支、提交↔提交（中间隔多少次都行），列出差异文件与逐文件改动
 - **文件监听**：IDE 里改完保存，GitDesk 自己就刷新了，不用按 F5
 - 分栏 diff（左＝原内容，右＝修改后），可切统一视图；标题标明两侧语义（暂存区 ↔ 工作区 / HEAD ↔ 暂存区 / 父提交 ↔ 本次提交）
+- 差异块导航（`n/2` + 上下跳）、hunk 之间折叠成「⋯ N 行未改动 ⋯」
 - 双击文件行弹出**全屏 diff**，大改动也能看全
 - 文件区带页签：工作区 + 每个点开的历史提交 / Stash 各占一个页签
 
@@ -48,6 +51,7 @@
 
 **分支与冲突**
 - 双击本地分支切换（单击不动作，避免误切）；新建 / 删除标签与分支
+- 任意提交可「拣选」（cherry-pick）到当前分支，或「还原」（revert，生成反向提交）；冲突时走顶部继续/中止
 - Stash 保存 / 应用 / Pop / 删除；单击 stash 可先看内容
 - 冲突逐块决策：采用我方 / 对方 / 两者 / 对方在前，或整文件 `checkout --ours|--theirs`，写回后自动 `git add`
 

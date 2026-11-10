@@ -388,6 +388,17 @@ gitdesk/
 2. 搜索的 `--branches` 放在 `--` 之后 → 被当成路径，搜索范围退化成只有 HEAD（已加回归断言：只在未合并分支上的文件也必须能搜到）
 3. 监听的忽略规则里有 `/.tmp/`，而仓库本身在 `.../.tmp/demo` → **所有事件被误杀**，表现为"监听成功但永远收不到"。改为相对监听根目录判断
 
+### 布局 v10：CI / 差异导航 / 拣选还原
+
+- **CI**：GitHub Actions 两job（windows-latest）——前端跑 typecheck + 179 项 verify + build；Rust 跑 `cargo check --locked`；README 挂 badge
+- **差异块导航**：`n/N` 计数 + 上/下一个按钮，`scrollIntoView({block:'center'})` 定位；换文件/换提交自动回到第 1 块
+- **折叠未改动区**：hunk 之间插入「⋯ N 行未改动 ⋯」（`cur.oldStart - (prev.oldStart + prev.oldLines)`）
+- **拣选 / 还原**：提交头部两个按钮，`git cherry-pick <sha>` / `git revert --no-edit <sha>`；冲突后由 v9 的「进行中」横幅接管
+
+顺带修掉一个"patch 没生效"的问题：`interactive` 与 `containerRef` 的替换锚点缩进写错了，
+导致 stash/compare 视图仍然可点选、差异导航拿不到容器 ref（表现为按钮点了没反应）。
+这提醒以后改 JSX 要用 `assert old in s` 校验锚点，不要静默失败。
+
 ### 与初版方案的偏离（有意为之）
 
 | 方案原定 | 实际 | 原因 |

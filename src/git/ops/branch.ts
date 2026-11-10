@@ -130,3 +130,15 @@ export async function listRangeCommits(
       return { sha, author: author ?? '', subject: subject ?? '' };
     });
 }
+
+/* ------------------------------------------------- 挑拣 / 还原单个提交 */
+
+/** 把某个提交拣选到当前分支（可能冲突，冲突后走 ongoing 横幅继续/中止） */
+export async function cherryPick(repoPath: string, sha: string) {
+  return runGit(['cherry-pick', sha], { cwd: repoPath, timeoutMs: 300_000 });
+}
+
+/** 生成一个反向提交（不改历史），--no-edit 避免弹编辑器 */
+export async function revertCommit(repoPath: string, sha: string) {
+  return runGit(['revert', '--no-edit', sha], { cwd: repoPath, timeoutMs: 300_000 });
+}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { hasStaged, hasWorktree, useStore } from '../store';
 import type { Side } from '../types';
 import { DiffView, type DiffMode } from './DiffView';
@@ -28,6 +28,31 @@ function useDiffMode(): [DiffMode, (m: DiffMode) => void] {
 function sidesLabel(kind: 'commit' | 'file', side: Side, hasParent: boolean): string {
   if (kind === 'commit') return hasParent ? '父提交 ↔ 本次提交' : '空 ↔ 本次提交';
   return side === 'staged' ? 'HEAD ↔ 暂存区' : '暂存区 ↔ 工作区';
+}
+
+function HunkNav({
+  count,
+  index,
+  onGo,
+}: {
+  count: number;
+  index: number;
+  onGo: (delta: number) => void;
+}) {
+  if (count === 0) return null;
+  return (
+    <span className="hunk-nav">
+      <span className="hunk-nav-count">
+        {Math.min(index + 1, count)}/{count}
+      </span>
+      <button className="icon-btn" title="上一个差异块" onClick={() => onGo(-1)}>
+        ↑
+      </button>
+      <button className="icon-btn" title="下一个差异块" onClick={() => onGo(1)}>
+        ↓
+      </button>
+    </span>
+  );
 }
 
 function ModeToggle({ mode, onChange }: { mode: DiffMode; onChange: (m: DiffMode) => void }) {
@@ -64,6 +89,30 @@ export function DetailPanel() {
   const conflictSides = useStore((s) => s.conflictSides);
   const status = useStore((s) => s.status);
   const [mode, setMode] = useDiffMode();
+  const cherryPickOp = useStore((s) => s.cherryPickOp);
+  const revertOp = useStore((s) => s.revertOp);
+
+  const diffRef = useRef<HTMLDivElement>(null);
+  const [hunkIdx, setHunkIdx] = useState(0);
+  const hunkCount = useMemo(
+    () => patches.reduce((n, p) => n + p.hunks.length, 0),
+    [patches],
+  );
+
+  // 换文件/换提交时回到第一个差异块
+  useEffect(() => {
+    setHunkIdx(0);
+  }, [patches]);
+
+  const goHunk = (delta: number) => {
+    const root = diffRef.current;
+    if (!root) return;
+    const heads = root.querySelectorAll<HTMLElement>('.hunk-head');
+    if (heads.length === 0) return;
+    const next = Math.max(0, Math.min(heads.length - 1, hunkIdx + delta));
+    setHunkIdx(next);
+    heads[next].scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
 
   const commit = useMemo(
     () => commits.find((c) => c.sha === selectedSha) ?? null,
@@ -127,6 +176,21 @@ export function DetailPanel() {
             </span>
             <span className="sides-label">· {sidesLabel('commit', side, commit.parents.length > 0)}</span>
             <span className="spacer" />
+            <button
+              className="btn small"
+              title={`把 ${commit.sha.slice(0, 7)} 拣选到当前分支（git cherry-pick）`}
+              onClick={() => void cherryPickOp(commit.sha)}
+            >
+              拣选
+            </button>
+            <button
+              className="btn small"
+              title={`生成一个反向提交（git revert）`}
+              onClick={() => void revertOp(commit.sha)}
+            >
+              还原
+            </button>
+            <HunkNav count={hunkCount} index={hunkIdx} onGo={goHunk} />
             <ModeToggle mode={mode} onChange={setMode} />
           </div>
 
@@ -162,6 +226,7 @@ export function DetailPanel() {
             </>
           )}
           <span className="spacer" />
+          {!isConflict && <HunkNav count={hunkCount} index={hunkIdx} onGo={goHunk} />}
           {!isConflict && <ModeToggle mode={mode} onChange={setMode} />}
         </div>
       )}
@@ -175,11 +240,12 @@ export function DetailPanel() {
           patches={patches}
           loading={diffLoading}
           hasTarget={target !== null}
-          interactive={!isCommitView}
+          interactive={!isCommitView && !isStashView && !isCompareView}
           side={side}
           mode={mode}
+          containerRef={diffRef}
           emptyText={
-            !isCommitView && side === 'staged'
+            !isCommitView && !isStashView && !isCompareView && side === 'staged'
               ? '这个文件没有已暂存的内容'
               : !isCommitView && entry && !hasWorktree(entry) && !hasStaged(entry)
                 ? '这个文件已经没有改动了'

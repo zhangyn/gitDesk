@@ -2841,3 +2841,47 @@ body.is-resizing-x {
 .sb-item.danger {
   color: var(--danger);
 }
+
+/* 折叠的未改动区 */
+.hunk-gap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 12px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--dim-2);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  user-select: none;
+}
+
+.hunk-gap span {
+  opacity: 0.85;
+}
+
+/* 差异块导航 */
+.hunk-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0 2px;
+  flex: 0 0 auto;
+}
+
+.hunk-nav-count {
+  padding: 0 5px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 400;
+}
+
+.hunk-nav .icon-btn {
+  width: 17px;
+  height: 17px;
+  font-size: 11px;
+}

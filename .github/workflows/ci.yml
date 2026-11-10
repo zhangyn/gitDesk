@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  frontend:
+    name: 前端（类型 / 验证 / 构建）
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: 类型检查
+        run: npm run typecheck
+
+      # 179 项端到端断言：用真实 git 造合并/冲突/中文路径/CRLF 等场景
+      - name: 端到端验证
+        run: npm run verify
+
+      - name: 生产构建
+        run: npm run build
+
+  rust:
+    name: Rust（cargo check）
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: cargo check --manifest-path src-tauri/Cargo.toml --locked
