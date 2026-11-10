@@ -255,21 +255,6 @@ body.is-resizing {
   opacity: 0.38;
 }
 
-.tb-btn.primary {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--fg-strong);
-}
-
-.tb-btn.primary:hover:not(:disabled) {
-  background: var(--primary-hover);
-  border-color: var(--primary-hover);
-}
-
-.tb-btn.primary.is-on {
-  box-shadow: 0 0 0 2px rgba(31, 111, 235, 0.35);
-}
-
 .tb-btn.is-on {
   background: var(--bg-raised);
   color: var(--accent);
@@ -284,16 +269,12 @@ body.is-resizing {
   min-width: 15px;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--hover-2);
+  background: var(--bg-raised);
+  color: var(--accent);
   font-size: 10px;
   font-family: var(--mono);
   line-height: 14px;
   text-align: center;
-}
-
-.tb-btn:not(.primary) .tb-count {
-  background: var(--bg-raised);
-  color: var(--accent);
 }
 
 .tb-count.up {

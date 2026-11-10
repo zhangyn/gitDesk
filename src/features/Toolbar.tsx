@@ -30,7 +30,6 @@ function TB({
   disabled,
   active,
   caret,
-  primary,
   title,
 }: {
   icon?: ComponentType<{ size?: number; className?: string }>;
@@ -39,12 +38,11 @@ function TB({
   disabled?: boolean;
   active?: boolean;
   caret?: boolean;
-  primary?: boolean;
   title?: string;
 }) {
   return (
     <button
-      className={`tb-btn${primary ? ' primary' : ''}${active ? ' is-on' : ''}`}
+      className={`tb-btn${active ? ' is-on' : ''}`}
       disabled={disabled}
       onClick={onClick}
       title={title}
@@ -216,7 +214,6 @@ export function Toolbar() {
       <TB
         icon={IconCommit}
         label="提交"
-        primary
         active={bottomPanel === 'commit'}
         disabled={disabled || noRepo}
         onClick={() => setBottomPanel('commit')}
