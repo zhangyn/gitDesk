@@ -67,6 +67,29 @@ function gapBefore(prev: DiffHunk | undefined, cur: DiffHunk): number {
   return cur.oldStart - (prev.oldStart + prev.oldLines);
 }
 
+/** 差异块头部的快捷按钮：只暂存这一块，不用先去选行 */
+function HunkAction({ keys, side }: { keys: string[]; side: Side }) {
+  const stageKeys = useStore((s) => s.stageKeys);
+  const undo = side === 'staged';
+  if (keys.length === 0) return null;
+  return (
+    <button
+      className="hunk-act"
+      title={
+        undo
+          ? '只取消暂存这一块的改动'
+          : '只暂存这一块的改动 —— 文件里其它改动保留在工作区'
+      }
+      onClick={(e) => {
+        e.stopPropagation();
+        void stageKeys(keys, undo);
+      }}
+    >
+      {undo ? '取消暂存此块' : '暂存此块'}
+    </button>
+  );
+}
+
 function GapRow({ lines }: { lines: number }) {
   if (lines <= 0) return null;
   return (
@@ -180,6 +203,8 @@ function SplitView({
                 <span className="selbox">{allSel ? '◼' : someSel ? '◧' : '◻'}</span>
               )}
               <span className="hh mono">{hunk.header}</span>
+              {interactive && <span className="spacer" />}
+              {interactive && <HunkAction keys={keys} side={side} />}
             </div>
 
             {rows.map((row, ri) => {
@@ -251,6 +276,8 @@ function UnifiedView({
                 <span className="selbox">{allSel ? '◼' : someSel ? '◧' : '◻'}</span>
               )}
               <span className="hh mono">{hunk.header}</span>
+              {interactive && <span className="spacer" />}
+              {interactive && <HunkAction keys={keys} side={side} />}
             </div>
 
             {hunk.lines.map((line, li) => {

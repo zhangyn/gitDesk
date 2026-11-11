@@ -224,17 +224,17 @@ export function Toolbar() {
 
       <TB
         icon={IconStage}
-        label="暂存"
+        label="全部暂存"
         disabled={disabled || counts.worktree === 0}
         onClick={() => void stageAllOp()}
-        title="暂存全部改动（git add -A）"
+        title="暂存所有文件的所有改动（git add -A）；只暂存某个文件或某几行请用左侧行内 + 号或右侧差异块按钮"
       />
       <TB
         icon={IconUnstage}
-        label="取消暂存"
+        label="全部取消"
         disabled={disabled || counts.staged === 0}
         onClick={() => void unstageAllOp()}
-        title="取消全部暂存（git reset HEAD）"
+        title="取消所有文件的暂存（git reset HEAD）"
       />
 
       <span className="tb-sep" />

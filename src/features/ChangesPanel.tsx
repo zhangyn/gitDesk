@@ -96,7 +96,7 @@ function ChangeRow({ entry }: { entry: StatusEntry }) {
           {worktree && (
             <button
               className="icon-btn"
-              title={untracked ? '暂存（git add）' : '暂存整个文件'}
+              title={untracked ? '暂存整个文件（git add）' : '暂存整个文件 —— 只暂存部分改动请在右侧选行或点差异块上的按钮'}
               disabled={disabled}
               onClick={() => void stageEntry(entry)}
             >
@@ -106,7 +106,7 @@ function ChangeRow({ entry }: { entry: StatusEntry }) {
           {staged && (
             <button
               className="icon-btn"
-              title="取消暂存整个文件"
+              title="取消暂存整个文件 —— 只取消部分请在右侧切到「已暂存」后选行"
               disabled={disabled}
               onClick={() => void unstageEntry(entry)}
             >

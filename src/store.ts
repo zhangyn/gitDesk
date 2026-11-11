@@ -287,6 +287,8 @@ interface AppStore {
 
   stageSelection: () => Promise<void>;
   unstageSelection: () => Promise<void>;
+  /** 按指定的行 key 集合暂存/取消暂存（差异块上的「暂存此块」用它） */
+  stageKeys: (keys: string[], undo: boolean) => Promise<void>;
   discardSelection: () => Promise<void>;
   stageEntry: (entry: StatusEntry) => Promise<void>;
   unstageEntry: (entry: StatusEntry) => Promise<void>;
@@ -999,6 +1001,19 @@ export const useStore = create<AppStore>()((set, get) => {
       const { patch, count } = buildSelectedPatch(patches, selection, side);
       if (count === 0) return;
       await mutate(`暂存 ${count} 行`, false, () => applyPatchToIndex(getRepoPath(), patch, false));
+    },
+
+    async stageKeys(keys, undo) {
+      const { patches, side } = get();
+      if (keys.length === 0) return;
+      const subset = new Set(keys);
+      const { patch, count } = buildSelectedPatch(patches, subset, side);
+      if (count === 0) return;
+      await mutate(
+        undo ? `取消暂存 ${count} 行` : `暂存 ${count} 行`,
+        false,
+        () => applyPatchToIndex(getRepoPath(), patch, undo),
+      );
     },
 
     async unstageSelection() {

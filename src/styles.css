@@ -2970,3 +2970,35 @@ body.is-resizing-x {
 .cred-hint .mono {
   color: var(--fg-dim);
 }
+
+/* 差异块上的快捷暂存按钮：平时淡出，hover 整块时出现 */
+.hunk-head .spacer {
+  flex: 1 1 auto;
+}
+
+.hunk-act {
+  flex: 0 0 auto;
+  margin: 1px 2px 1px 8px;
+  padding: 1px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--fg-dim);
+  font-size: 10.5px;
+  font-family: var(--sans);
+  /* 常驻但淡显：藏到 hover 后面等于没有（用户根本发现不了这个能力） */
+  opacity: 0.55;
+  transition: opacity 0.1s, background 0.1s;
+}
+
+.hunk:hover .hunk-act,
+.hunk-head:hover .hunk-act,
+.hunk-act:focus-visible {
+  opacity: 1;
+}
+
+.hunk-act:hover {
+  color: var(--fg);
+  border-color: var(--border-strong);
+  background: var(--btn-hover);
+}
