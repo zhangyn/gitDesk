@@ -115,8 +115,27 @@ export function Toolbar() {
   const rebaseOntoOp = useStore((s) => s.rebaseOntoOp);
   const stashSaveOp = useStore((s) => s.stashSaveOp);
   const stashApplyOp = useStore((s) => s.stashApplyOp);
-  const stageAllOp = useStore((s) => s.stageAllOp);
-  const unstageAllOp = useStore((s) => s.unstageAllOp);
+  const stagePicked = useStore((s) => s.stagePicked);
+  const unstagePicked = useStore((s) => s.unstagePicked);
+  const pickedPaths = useStore((s) => s.pickedPaths);
+
+  // 勾选的文件里，哪些还能暂存（工作区有改动）、哪些还能取消暂存（暂存区有改动）
+  const pickedWorktree = useMemo(
+    () =>
+      pickedPaths.filter((p) => {
+        const e = status?.entries.find((x) => x.path === p);
+        return !!e && (e.kind === 'untracked' || e.worktree !== '.');
+      }),
+    [pickedPaths, status],
+  );
+  const pickedStaged = useMemo(
+    () =>
+      pickedPaths.filter((p) => {
+        const e = status?.entries.find((x) => x.path === p);
+        return !!e && e.kind !== 'untracked' && e.index !== '.';
+      }),
+    [pickedPaths, status],
+  );
   const setBottomPanel = useStore((s) => s.setBottomPanel);
   const createTagOp = useStore((s) => s.createTagOp);
   const logScope = useStore((s) => s.logScope);
@@ -224,17 +243,25 @@ export function Toolbar() {
 
       <TB
         icon={IconStage}
-        label="全部暂存"
-        disabled={disabled || counts.worktree === 0}
-        onClick={() => void stageAllOp()}
-        title="暂存所有文件的所有改动（git add -A）；只暂存某个文件或某几行请用左侧行内 + 号或右侧差异块按钮"
+        label="暂存"
+        disabled={disabled || pickedWorktree.length === 0}
+        onClick={() => void stagePicked()}
+        title={
+          pickedWorktree.length > 0
+            ? `暂存选中的 ${pickedWorktree.length} 个文件（Ctrl/Shift 多选）`
+            : '先在左侧勾选文件（Ctrl 点选多个 / Shift 连选），再点这里暂存；要暂存全部用列表右上角的「全部暂存」'
+        }
       />
       <TB
         icon={IconUnstage}
-        label="全部取消"
-        disabled={disabled || counts.staged === 0}
-        onClick={() => void unstageAllOp()}
-        title="取消所有文件的暂存（git reset HEAD）"
+        label="取消暂存"
+        disabled={disabled || pickedStaged.length === 0}
+        onClick={() => void unstagePicked()}
+        title={
+          pickedStaged.length > 0
+            ? `取消暂存选中的 ${pickedStaged.length} 个文件`
+            : '先在左侧勾选要取消暂存的文件；要全部取消用列表右上角的「全部取消」'
+        }
       />
 
       <span className="tb-sep" />

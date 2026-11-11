@@ -38,8 +38,10 @@ import {
   discardFileChanges,
   stageAll,
   stageFile,
+  stagePaths,
   unstageAll,
   unstageFile,
+  unstagePaths,
 } from './git/ops/indexOps';
 import { createCommit, getLastCommitMessage, type CommitOptions } from './git/ops/commit';
 import {
@@ -222,6 +224,14 @@ interface AppStore {
   /** 提交历史搜索（null = 不过滤） */
   logQuery: LogSearch | null;
   logSearching: boolean;
+  /** 变更列表里被勾选的文件（多选，供工具栏「暂存 / 取消暂存」使用） */
+  pickedPaths: string[];
+  /** Shift 连选的锚点 */
+  fileAnchor: string | null;
+  pickFile: (path: string, mode: 'single' | 'toggle' | 'range', order?: string[]) => void;
+  clearPicked: () => void;
+  stagePicked: () => Promise<void>;
+  unstagePicked: () => Promise<void>;
   /** 行内差异高亮开关 */
   wordDiff: boolean;
   toggleWordDiff: () => void;
@@ -351,6 +361,8 @@ const EMPTY_REPO_STATE = {
   logQuery: null,
   logSearching: false,
   logLimit: LOG_PAGE,
+  pickedPaths: [] as string[],
+  fileAnchor: null,
   wordDiff: localStorage.getItem('gitdesk.wordDiff') !== '0',
   compareInfo: null,
   credRequest: null,
@@ -741,6 +753,10 @@ export const useStore = create<AppStore>()((set, get) => {
           set({ selectedSha: commits[0]?.sha ?? null });
         }
 
+        // 勾选的文件可能已经被暂存/删除，裁掉不存在的
+        const picked = get().pickedPaths.filter((p) => status.entries.some((e) => e.path === p));
+        if (picked.length !== get().pickedPaths.length) set({ pickedPaths: picked });
+
         // 页签合法性：已消失的提交要清理掉
         const tabs = get().commitTabs.filter((t) =>
           t.kind === 'stash'
@@ -794,6 +810,8 @@ export const useStore = create<AppStore>()((set, get) => {
         logQuery: text.trim() ? { mode, text } : null,
         logSearching: Boolean(text.trim()),
         logLimit: LOG_PAGE,
+  pickedPaths: [] as string[],
+  fileAnchor: null,
   wordDiff: localStorage.getItem('gitdesk.wordDiff') !== '0',
       });
       void get().refresh();
@@ -802,6 +820,61 @@ export const useStore = create<AppStore>()((set, get) => {
     clearLogQuery() {
       set({ logQuery: null, logSearching: false, logLimit: LOG_PAGE });
       void get().refresh();
+    },
+
+    pickFile(path, mode, order) {
+      const cur = new Set(get().pickedPaths);
+      const anchor = get().fileAnchor ?? path;
+      if (mode === 'single') {
+        cur.clear();
+        cur.add(path);
+      } else if (mode === 'toggle') {
+        if (cur.has(path)) cur.delete(path);
+        else cur.add(path);
+      } else {
+        const list = order ?? [];
+        const i = list.indexOf(anchor);
+        const j = list.indexOf(path);
+        if (i >= 0 && j >= 0) {
+          const [lo, hi] = i <= j ? [i, j] : [j, i];
+          for (let k = lo; k <= hi; k++) cur.add(list[k]);
+        } else {
+          cur.add(path);
+        }
+      }
+      // 顺序按列表顺序保存，操作日志/命令里的路径顺序更稳定
+      const next = order ? order.filter((p) => cur.has(p)) : [...cur];
+      set({
+        pickedPaths: next,
+        fileAnchor: mode === 'range' ? get().fileAnchor ?? path : path,
+      });
+    },
+
+    clearPicked() {
+      set({ pickedPaths: [], fileAnchor: null });
+    },
+
+    async stagePicked() {
+      const status = get().status;
+      const paths = get().pickedPaths.filter((p) => {
+        const e = status?.entries.find((x) => x.path === p);
+        if (!e) return false;
+        return e.kind === 'untracked' || e.worktree !== '.';
+      });
+      if (paths.length === 0) return;
+      await mutate(`暂存 ${paths.length} 个文件`, false, () => stagePaths(getRepoPath(), paths));
+    },
+
+    async unstagePicked() {
+      const status = get().status;
+      const paths = get().pickedPaths.filter((p) => {
+        const e = status?.entries.find((x) => x.path === p);
+        return !!e && e.kind !== 'untracked' && e.index !== '.';
+      });
+      if (paths.length === 0) return;
+      await mutate(`取消暂存 ${paths.length} 个文件`, false, () =>
+        unstagePaths(getRepoPath(), paths),
+      );
     },
 
     toggleWordDiff() {

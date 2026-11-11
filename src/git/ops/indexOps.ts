@@ -5,6 +5,20 @@ export async function stageFile(repoPath: string, path: string): Promise<void> {
   await runGitChecked(['add', '-A', '--', path], { cwd: repoPath, timeoutMs: 60_000 });
 }
 
+/** 暂存指定的多个文件（-A 让删除也能被记录） */
+export async function stagePaths(repoPath: string, paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  await runGitChecked(['add', '-A', '--', ...paths], { cwd: repoPath, timeoutMs: 120_000 });
+}
+
+/** 取消暂存指定的多个文件；没有 HEAD 时退化为 rm --cached */
+export async function unstagePaths(repoPath: string, paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  const res = await runGit(['restore', '--staged', '--', ...paths], { cwd: repoPath });
+  if (res.code === 0) return;
+  await runGitChecked(['rm', '--cached', '-r', '-q', '--', ...paths], { cwd: repoPath });
+}
+
 export async function stageAll(repoPath: string): Promise<void> {
   await runGitChecked(['add', '-A'], { cwd: repoPath, timeoutMs: 120_000 });
 }

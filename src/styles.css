@@ -3002,3 +3002,15 @@ body.is-resizing-x {
   border-color: var(--border-strong);
   background: var(--btn-hover);
 }
+
+/* 多选：勾选的行给底色，正在预览的那行额外有左侧强调条 */
+.chg-row.is-checked {
+  background: var(--sel);
+}
+
+.picked-count {
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}

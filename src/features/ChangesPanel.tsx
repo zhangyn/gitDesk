@@ -47,9 +47,11 @@ const FILE_TONE: Record<string, Tone> = {
   U: 'conflict',
 };
 
-/** 工作区变更行 */
-function ChangeRow({ entry }: { entry: StatusEntry }) {
+/** 工作区变更行。单击选中并预览，Ctrl 切换勾选，Shift 连选 */
+function ChangeRow({ entry, order }: { entry: StatusEntry; order: string[] }) {
   const target = useStore((s) => s.target);
+  const picked = useStore((s) => s.pickedPaths.includes(entry.path));
+  const pickFile = useStore((s) => s.pickFile);
   const showChange = useStore((s) => s.showChange);
   const openDiffModal = useStore((s) => s.openDiffModal);
   const stageEntry = useStore((s) => s.stageEntry);
@@ -67,14 +69,23 @@ function ChangeRow({ entry }: { entry: StatusEntry }) {
 
   return (
     <div
-      className={`chg-row${active ? ' is-active' : ''}${unmerged ? ' is-conflict' : ''}`}
-      title={`${entry.path}\n${describeEntry(entry)}\n单击预览 · 双击放大`}
+      className={`chg-row${active ? ' is-active' : ''}${picked ? ' is-checked' : ''}${
+        unmerged ? ' is-conflict' : ''
+      }`}
+      title={`${entry.path}\n${describeEntry(entry)}\n单击选中并预览 · Ctrl 多选 · Shift 连选 · 双击放大`}
       onDoubleClick={async () => {
         await showChange(entry);
         openDiffModal();
       }}
     >
-      <button className="chg-main" onClick={() => void showChange(entry)}>
+      <button
+        className="chg-main"
+        onClick={(e) => {
+          const mode = e.shiftKey ? 'range' : e.ctrlKey || e.metaKey ? 'toggle' : 'single';
+          pickFile(entry.path, mode, order);
+          void showChange(entry);
+        }}
+      >
         <span className="chg-chips" title="左：暂存区状态　右：工作区状态">
           <Chip
             letter={untracked ? '.' : entry.index}
@@ -171,6 +182,7 @@ export function ChangesPanel() {
   const closeCommitTab = useStore((s) => s.closeCommitTab);
   const stageAllOp = useStore((s) => s.stageAllOp);
   const unstageAllOp = useStore((s) => s.unstageAllOp);
+  const pickedCount = useStore((s) => s.pickedPaths.length);
 
   const [filter, setFilter] = useState('');
 
@@ -235,6 +247,11 @@ export function ChangesPanel() {
 
         {isWorktree ? (
           <>
+            {pickedCount > 0 && (
+              <span className="picked-count" title="已勾选的文件数（工具栏的暂存/取消暂存只作用于勾选项）">
+                已选 {pickedCount} 个
+              </span>
+            )}
             <span className="chips-legend" title="每行两个格子：左=暂存区状态，右=工作区状态">
               左 暂存区 · 右 工作区
             </span>
@@ -283,7 +300,11 @@ export function ChangesPanel() {
               <div className="empty-hint small">没有匹配的文件</div>
             )}
             {entries.map((e) => (
-              <ChangeRow key={`${e.path}-${e.kind}`} entry={e} />
+              <ChangeRow
+                key={`${e.path}-${e.kind}`}
+                entry={e}
+                order={entries.map((x) => x.path)}
+              />
             ))}
           </>
         ) : (

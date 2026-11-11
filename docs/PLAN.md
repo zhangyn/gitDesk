@@ -451,6 +451,21 @@ gitdesk/
 应用里点推送 → 弹凭据框（标题带 host）→ 填入后重试，服务端日志收到
 `auth=Basic demo-user:demo-token-123`，同时命令日志里只有干净的 `git push origin refs/heads/main`（`leaked: false`）。
 
+### v14：按选中的文件暂存（而不是全部）
+
+用户反馈「点暂存作用在所有文件」。之前工具栏那两颗按钮是 `git add -A` / `git reset HEAD`，
+贴什么名字都可能被误解 —— 正确做法是让它们**只作用于选中的文件**：
+
+- 变更列表支持多选：单击选中、`Ctrl` 点选切换、`Shift` 连选（锚点存在 store 里，按显示顺序取区间）
+- `stagePicked()` / `unstagePicked()` 只处理勾选且状态匹配的文件（`git add -A -- p1 p2 …` /
+  `git restore --staged -- p1 p2 …`），命中 0 个时按钮直接禁用
+- 「全部」保留两个明确入口：列表右上角的「全部暂存 / 全部取消」（本来就存在）、「更多」菜单
+- 勾选状态在刷新时自动裁掉已消失的路径
+
+验证（三个文件：readme.md、src/app.ts 已修改，新文件.txt 未跟踪）：
+单击 + Ctrl 点选 → `已选 2 个` → 点「暂存」→ `git diff --cached --name-only` 恰好是
+`readme.md` / `src/app.ts`，`新文件.txt` 仍是 `??`；再点「取消暂存」两者回到 ` M`。
+
 ### 与初版方案的偏离（有意为之）
 
 | 方案原定 | 实际 | 原因 |
