@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { parseStatusV2 } from '../src/parse/status';
+import { parseRemoteUrl } from '../src/git/ops/remote';
 
 let pass = 0;
 let fail = 0;
@@ -19,6 +20,10 @@ function check(name: string, cond: boolean, detail?: unknown): void {
     fail += 1;
     failures.push(`${name}${detail === undefined ? '' : ` → ${JSON.stringify(detail)}`}`);
   }
+}
+
+function eq(name: string, actual: unknown, expected: unknown): void {
+  check(name, JSON.stringify(actual) === JSON.stringify(expected), { actual, expected });
 }
 
 const root = mkdtempSync(join(tmpdir(), 'gitdesk-remote-'));
@@ -162,6 +167,34 @@ try {
   git(aDir, ['commit', '-q', '-am', 'local change 3']);
   const leaseStale = tryGit(aDir, ['push', '--force-with-lease', 'origin', 'refs/heads/main']);
   check('lease 过期时强推被拒绝（防止覆盖别人）', leaseStale.code !== 0, leaseStale.out);
+
+  // 10.5 凭据注入：与 src/git/runner.ts 的 AUTH_HELPER 完全一致的写法
+  const helper = '!f() { echo username=$GD_USER; echo password=$GD_PASS; }; f';
+  const filled = execFileSync(
+    'git',
+    ['-c', 'credential.helper=', '-c', `credential.helper=${helper}`, 'credential', 'fill'],
+    {
+      cwd: aDir,
+      input: 'protocol=https\nhost=example.test\n\n',
+      encoding: 'utf8',
+      env: { ...process.env, GD_USER: 'u-test', GD_PASS: 'p-test' },
+    },
+  );
+  check('凭据：env 注入能被 credential helper 回填', filled.includes('username=u-test'), filled);
+  check('凭据：密码同样来自 env', filled.includes('password=p-test'), filled);
+
+  // remote URL 解析（决定凭据要写到哪个 host）
+  eq('remote 解析：https', parseRemoteUrl('https://github.com/zhangyn/gitDesk.git'), {
+    protocol: 'https',
+    host: 'github.com',
+    path: 'zhangyn/gitDesk',
+  });
+  eq('remote 解析：带用户名', parseRemoteUrl('https://user@git.example.com/a/b.git'), {
+    protocol: 'https',
+    host: 'git.example.com',
+    path: 'a/b',
+  });
+  eq('remote 解析：SSH 不处理', parseRemoteUrl('git@github.com:a/b.git'), null);
 
   // 11. 拉取策略：rebase
   tryGit(aDir, ['fetch', 'origin']);

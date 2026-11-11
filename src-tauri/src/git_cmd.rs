@@ -22,13 +22,20 @@ use std::os::windows::process::CommandExt;
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// 保证输出可解析：不转义中文路径、不上色、不分页。
-const GIT_BASE_ARGS: [&str; 6] = [
+/// 另外禁掉凭据管理器的交互式弹窗：GCM 会弹 GUI 登录窗并**一直等**，
+/// 从桌面应用里调用时表现为整条命令挂死（所有按钮变灰，没有任何提示）。
+/// 已缓存的凭据照常可用；没有缓存就直接失败，由前端弹我们自己的凭据框。
+const GIT_BASE_ARGS: [&str; 10] = [
     "-c",
     "core.quotepath=false",
     "-c",
     "color.ui=false",
     "-c",
     "core.pager=cat",
+    "-c",
+    "credential.interactive=never",
+    "-c",
+    "credential.guiPrompt=false",
 ];
 
 /// 运行中的子进程注册表：opId -> pid，用于取消。
@@ -48,6 +55,9 @@ pub struct RunRequest {
     pub input: Option<String>,
     #[serde(default)]
     pub git_path: Option<String>,
+    /// 额外环境变量（凭据走 env 传，避免出现在命令行/日志里）
+    #[serde(default)]
+    pub env: Option<Vec<(String, String)>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -105,10 +115,16 @@ fn base_cmd(req: &RunRequest) -> Command {
     cmd.args(GIT_BASE_ARGS);
     cmd.args(&req.args);
     cmd.current_dir(&req.cwd);
+    if let Some(envs) = req.env.as_ref() {
+        for (k, v) in envs {
+            cmd.env(k, v);
+        }
+    }
     cmd.env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_PAGER", "cat")
         // rebase --continue / commit --amend 之类会调编辑器；给它一个 true，
         // 否则在无 tty 的情况下 git 会直接报 "Terminal is dumb"
+        .env("GCM_INTERACTIVE", "never")
         .env("GIT_EDITOR", "true")
         .env("GIT_SEQUENCE_EDITOR", "true")
         .env("LC_ALL", "C");

@@ -7,6 +7,7 @@ import { CenterStack } from './features/CenterStack';
 import { CommitPanel } from './features/CommitPanel';
 import { CommandLog } from './features/CommandLog';
 import { DiffModal } from './features/DiffModal';
+import { CredentialDialog } from './features/CredentialDialog';
 import { ModalHost } from './ui/Modal';
 import { StatusBar } from './features/StatusBar';
 
@@ -166,6 +167,7 @@ export default function App() {
       <StatusBar />
 
       <DiffModal />
+      <CredentialDialog />
       <ModalHost />
 
       {error && (

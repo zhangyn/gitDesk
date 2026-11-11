@@ -2946,3 +2946,27 @@ body.is-resizing-x {
   font-weight: 400;
   white-space: nowrap;
 }
+
+/* 凭据弹窗 */
+.cred-modal {
+  width: min(560px, calc(100vw - 48px));
+}
+
+.cred-remember {
+  margin-top: 12px;
+}
+
+.cred-hint {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-soft);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.cred-hint .mono {
+  color: var(--fg-dim);
+}

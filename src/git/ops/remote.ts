@@ -81,3 +81,41 @@ export function humanizeRemoteError(stderr: string): string {
   }
   return s;
 }
+
+/** 从 remote URL 里取出 protocol/host，用于把凭据写进 git 的凭据管理器 */
+export function parseRemoteUrl(
+  url: string,
+): { protocol: string; host: string; path: string } | null {
+  const https = /^(https?):\/\/(?:[^@/]+@)?([^/]+)\/(.+?)(?:\.git)?$/.exec(url.trim());
+  if (https) return { protocol: https[1], host: https[2], path: https[3] };
+  return null; // SSH 走密钥，不需要这里处理
+}
+
+/** 把凭据交给 git 自己的 credential helper（Windows 上通常是 Credential Manager） */
+export async function approveCredentials(
+  repoPath: string,
+  opts: { protocol: string; host: string; path?: string; username: string; password: string },
+) {
+  const lines = [
+    `protocol=${opts.protocol}`,
+    `host=${opts.host}`,
+    ...(opts.path ? [`path=${opts.path}`] : []),
+    `username=${opts.username}`,
+    `password=${opts.password}`,
+    '',
+    '',
+  ].join('\n');
+  return runGit(['credential', 'approve'], {
+    cwd: repoPath,
+    input: lines,
+    timeoutMs: 30_000,
+    quiet: true,
+  });
+}
+
+/** 认证类错误：需要弹凭据框，而不是直接报错 */
+export function isAuthError(text: string): boolean {
+  return /could not read Username|Authentication failed|terminal prompts disabled|Invalid username or password|Permission denied \(publickey\)|remote: HTTP Basic: Access denied|403 Forbidden|401 Unauthorized/i.test(
+    text,
+  );
+}

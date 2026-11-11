@@ -430,6 +430,27 @@ gitdesk/
 渲染侧：`<span class="wd">` 包住变化片段；del 侧红、add 侧绿，浅色主题单独调透明度。
 顶部「行内」按钮可关闭（写 localStorage），关掉后回到"整行高亮"。
 
+### v13：凭据弹窗（含一个 GCM 挂死的坑）
+
+**问题**：这台机器 Windows 侧的 git 配了 `credential.helper=helper-selector` → `manager`（GCM）。
+从桌面应用调用 `git push` 时，GCM 会开 GUI 登录窗并**一直等**，表现是整条命令挂住、
+所有按钮变灰、没有任何提示（实测卡了 8 秒以上才被我们的超时兜住）。
+
+**做法**
+
+1. Rust 侧统一注入 `GCM_INTERACTIVE=never` 与 `-c credential.interactive=never -c credential.guiPrompt=false`，
+   有缓存凭据照常使用，没有就快速失败而不是弹窗等待
+2. 认证失败（`could not read Username` / `Authentication failed` / `401` / `403` …）时，
+   把「要重试的动作」存成闭包，弹出我们自己的凭据框，而不是把英文错误丢给用户
+3. 凭据通过 **环境变量 + 一次性 credential helper** 注入：
+   `-c credential.helper=`（清空）`-c credential.helper='!f(){ echo username=$GD_USER; echo password=$GD_PASS; }; f'`
+   密码只在 env 里，**argv 里没有**，所以命令日志看不到、也不会被「复制命令」带走
+4. 勾「记住」→ `git credential approve`（stdin 传协议行），写进系统凭据管理器
+
+**验证**（本地假服务端，不触网）：起一个永远返回 401 的 HTTP 服务当 remote →
+应用里点推送 → 弹凭据框（标题带 host）→ 填入后重试，服务端日志收到
+`auth=Basic demo-user:demo-token-123`，同时命令日志里只有干净的 `git push origin refs/heads/main`（`leaked: false`）。
+
 ### 与初版方案的偏离（有意为之）
 
 | 方案原定 | 实际 | 原因 |

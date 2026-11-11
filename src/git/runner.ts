@@ -12,6 +12,18 @@ let gitPath = 'git';
  * 我们自己跑的 git 命令会改磁盘（add/commit/checkout…），这些变化由调用方主动 reload。
  * 记录一个时间窗，让文件监听在这个窗口内保持安静，避免"操作 → 监听 → 又刷新"的抖动。
  */
+/**
+ * 一次性凭据：由凭据弹窗设置，只在下次 git 调用时生效，用完立刻清空。
+ * 走环境变量 + 自定义 credential.helper，**密码永远不进 argv**，所以不会出现在命令日志里。
+ */
+let oneShotAuth: { user: string; pass: string } | null = null;
+
+export function setOneShotAuth(auth: { user: string; pass: string } | null): void {
+  oneShotAuth = auth;
+}
+
+const AUTH_HELPER = '!f() { echo username=$GD_USER; echo password=$GD_PASS; }; f';
+
 let suppressUntil = 0;
 export function watcherSuppressed(): boolean {
   return Date.now() < suppressUntil;
@@ -47,14 +59,24 @@ export interface GitOpts {
 export async function runGit(args: string[], opts: GitOpts): Promise<GitRunResult> {
   let res: GitRunResult;
   try {
+    // 有一次性凭据时：清空已配置的 helper，改用一个只回显环境变量的 helper
+    const authArgs = oneShotAuth
+      ? ['-c', 'credential.helper=', '-c', `credential.helper=${AUTH_HELPER}`]
+      : [];
     res = await invoke<GitRunResult>('git_run', {
       req: {
-        args,
+        args: [...authArgs, ...args],
         cwd: opts.cwd,
         opId: null,
         timeoutMs: opts.timeoutMs ?? 120_000,
         input: opts.input ?? null,
         gitPath,
+        env: oneShotAuth
+          ? [
+              ['GD_USER', oneShotAuth.user],
+              ['GD_PASS', oneShotAuth.pass],
+            ]
+          : null,
       },
     });
   } catch (e) {

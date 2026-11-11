@@ -14,7 +14,7 @@ import type {
   StatusEntry,
 } from './types';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { probeGit, runGit, watcherSuppressed } from './git/runner';
+import { probeGit, runGit, setOneShotAuth, watcherSuppressed } from './git/runner';
 import { openRepo } from './git/ops/repo';
 import { getStatus } from './git/ops/status';
 import {
@@ -74,9 +74,12 @@ import {
 import { createTag, deleteTag } from './git/ops/tag';
 import { stashFileDiff, stashFiles } from './git/ops/stash';
 import {
+  approveCredentials,
   fetchRemote,
   humanizeRemoteError,
+  isAuthError,
   listRemotes,
+  parseRemoteUrl,
   pullRemote,
   pushRemote,
   type RemoteInfo,
@@ -229,6 +232,11 @@ interface AppStore {
   clearLogQuery: () => void;
   /** 对比视图的元信息 */
   compareInfo: CompareInfo | null;
+  /** 远端认证失败时弹出的凭据请求（null = 不显示） */
+  credRequest: { label: string } | null;
+  askCredentials: (label: string, retry: () => Promise<void>) => void;
+  submitCredentials: (user: string, pass: string, remember: boolean) => Promise<void>;
+  cancelCredentials: () => void;
   /** 暂存区统计（提交面板用） */
   stagedStat: { files: number; insertions: number; deletions: number } | null;
   /** 上方文件区的页签集合与当前页签 */
@@ -343,6 +351,7 @@ const EMPTY_REPO_STATE = {
   logLimit: LOG_PAGE,
   wordDiff: localStorage.getItem('gitdesk.wordDiff') !== '0',
   compareInfo: null,
+  credRequest: null,
   stagedStat: null,
   commitTabs: [] as CommitTab[],
   fileTab: 'worktree' as FileTabKey,
@@ -357,6 +366,11 @@ const EMPTY_REPO_STATE = {
   decisions: {} as Record<number, Decision>,
   diffLoading: false,
 };
+
+/* --------------------------------------------------------------- 凭据请求 */
+
+/** 认证失败后要重试的那个动作（存在闭包里，不进 state 免得被序列化/比对） */
+let pendingRetry: (() => Promise<void>) | null = null;
 
 /* --------------------------------------------------------------- 文件监听 */
 
@@ -1348,32 +1362,101 @@ export const useStore = create<AppStore>()((set, get) => {
       });
     },
 
+    askCredentials(label, retry) {
+      pendingRetry = retry;
+      set({ credRequest: { label }, error: null });
+    },
+
+    async submitCredentials(user, pass, remember) {
+      const retry = pendingRetry;
+      if (!retry) {
+        set({ credRequest: null });
+        return;
+      }
+      set({ credRequest: null, error: null });
+      setOneShotAuth({ user, pass });
+      try {
+        await retry();
+        if (remember) {
+          const repo = get().repo;
+          const remote = get().remotes.find((r) => r.name === get().remote);
+          const parsed = remote ? parseRemoteUrl(remote.fetchUrl) : null;
+          if (repo && parsed) {
+            await approveCredentials(repo.path, {
+              protocol: parsed.protocol,
+              host: parsed.host,
+              path: parsed.path,
+              username: user,
+              password: pass,
+            });
+          }
+        }
+      } finally {
+        // 一次性凭据用完立即清掉
+        setOneShotAuth(null);
+        pendingRetry = null;
+      }
+    },
+
+    cancelCredentials() {
+      pendingRetry = null;
+      set({ credRequest: null });
+    },
+
     setRemote(name) {
       set({ remote: name });
     },
 
     async fetchOp() {
       const remote = get().remote;
-      set({ busy: `获取 ${remote}…`, error: null });
-      try {
-        const res = await fetchRemote(getRepoPath(), remote);
-        if (res.code !== 0) {
-          set({ error: humanizeRemoteError(res.stderr || res.stdout) });
-          return;
+      const attempt = async (): Promise<void> => {
+        set({ busy: `获取 ${remote}…`, error: null });
+        try {
+          const res = await fetchRemote(getRepoPath(), remote);
+          if (res.code !== 0) {
+            const raw = res.stderr || res.stdout;
+            if (isAuthError(raw)) {
+              get().askCredentials(`获取 ${remote}`, attempt);
+              return;
+            }
+            set({ error: humanizeRemoteError(raw) });
+            return;
+          }
+          await reload();
+        } catch (e) {
+          set({ error: errMsg(e) });
+        } finally {
+          set({ busy: null });
         }
-        await reload();
-      } catch (e) {
-        set({ error: errMsg(e) });
-      } finally {
-        set({ busy: null });
-      }
+      };
+      await attempt();
     },
 
     async pullOp(strategy) {
-      await mutate(`拉取（${strategy}）`, true, async () => {
-        const res = await pullRemote(getRepoPath(), strategy);
-        if (res.code !== 0) throw new Error(humanizeRemoteError(res.stderr || res.stdout));
-      });
+      const repo = get().repo;
+      if (!repo) return;
+      const attempt = async (): Promise<void> => {
+        set({ busy: `拉取（${strategy}）…`, error: null });
+        try {
+          await createBackup(repo.path, 'pull');
+          const res = await pullRemote(repo.path, strategy);
+          if (res.code !== 0) {
+            const raw = res.stderr || res.stdout;
+            if (isAuthError(raw)) {
+              get().askCredentials(`拉取（${strategy}）`, attempt);
+              return;
+            }
+            set({ error: humanizeRemoteError(raw) });
+            return;
+          }
+          await reload();
+        } catch (e) {
+          set({ error: errMsg(e) });
+        } finally {
+          set({ busy: null });
+        }
+      };
+      await attempt();
     },
 
     async pushOp(force) {
@@ -1394,19 +1477,27 @@ export const useStore = create<AppStore>()((set, get) => {
       }
       const remote = get().remote;
       const setUpstream = !status?.branch.upstream;
-      set({ busy: `推送 ${branch} → ${remote}…`, error: null });
-      try {
-        const res = await pushRemote(getRepoPath(), { remote, branch, force, setUpstream });
-        if (res.code !== 0) {
-          set({ error: humanizeRemoteError(res.stderr || res.stdout) });
-          return;
+      const attempt = async (): Promise<void> => {
+        set({ busy: `推送 ${branch} → ${remote}…`, error: null });
+        try {
+          const res = await pushRemote(getRepoPath(), { remote, branch, force, setUpstream });
+          if (res.code !== 0) {
+            const raw = res.stderr || res.stdout;
+            if (isAuthError(raw)) {
+              get().askCredentials(`推送 ${branch} → ${remote}`, attempt);
+              return;
+            }
+            set({ error: humanizeRemoteError(raw) });
+            return;
+          }
+          await reload();
+        } catch (e) {
+          set({ error: errMsg(e) });
+        } finally {
+          set({ busy: null });
         }
-        await reload();
-      } catch (e) {
-        set({ error: errMsg(e) });
-      } finally {
-        set({ busy: null });
-      }
+      };
+      await attempt();
     },
   };
 });
