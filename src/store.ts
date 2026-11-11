@@ -18,6 +18,7 @@ import { probeGit, runGit, setOneShotAuth, watcherSuppressed } from './git/runne
 import { openRepo } from './git/ops/repo';
 import { getStatus } from './git/ops/status';
 import {
+  getCommitBody,
   getCommitFiles,
   getLog,
   searchLog,
@@ -217,6 +218,8 @@ interface AppStore {
 
   selectedSha: string | null;
   commitFiles: CommitFile[];
+  /** 选中提交的完整信息（含正文，%B） */
+  commitBody: string;
 
   /** 提交历史的范围：local = 本地分支+HEAD，all = 含远程 */
   logScope: LogScope;
@@ -357,6 +360,7 @@ const EMPTY_REPO_STATE = {
   remote: 'origin',
   selectedSha: null,
   commitFiles: [] as CommitFile[],
+  commitBody: '',
   logScope: 'local' as LogScope,
   logQuery: null,
   logSearching: false,
@@ -507,6 +511,7 @@ export const useStore = create<AppStore>()((set, get) => {
         const stat = await compareStat(repo.path, res.aSha, res.bSha);
         set({
           commitFiles: res.files,
+          commitBody: '',
           compareInfo: {
             aSha: res.aSha,
             bSha: res.bSha,
@@ -529,11 +534,14 @@ export const useStore = create<AppStore>()((set, get) => {
         return;
       }
 
-      const files =
+      // 提交页签顺便取一次正文（%B），放在这里是为了和文件列表并发
+      const [files, body] = await Promise.all([
         tab.kind === 'stash'
-          ? await stashFiles(repo.path, stashRefOfKey(tab.key))
-          : await getCommitFiles(repo.path, tab.key);
-      set({ commitFiles: files, compareInfo: null });
+          ? stashFiles(repo.path, stashRefOfKey(tab.key))
+          : getCommitFiles(repo.path, tab.key),
+        tab.kind === 'commit' ? getCommitBody(repo.path, tab.key) : Promise.resolve(''),
+      ]);
+      set({ commitFiles: files, commitBody: body, compareInfo: null });
       if (files.length > 0) {
         const first = files[0];
         const patches =

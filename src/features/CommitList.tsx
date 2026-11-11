@@ -56,6 +56,7 @@ export function CommitList() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const loadingMoreRef = useRef(false);
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     loadingMoreRef.current = false;
@@ -67,6 +68,13 @@ export function CommitList() {
    * （表现为画布一直停在 canvas 默认的 300x150）。ref 回调在节点真正挂载时才会被调用。
    */
   const roRef = useRef<ResizeObserver | null>(null);
+  useEffect(
+    () => () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    },
+    [],
+  );
+
   const attachScroll = useCallback((el: HTMLDivElement | null) => {
     scrollRef.current = el;
     roRef.current?.disconnect();
@@ -114,7 +122,14 @@ export function CommitList() {
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    setScrollTop(el.scrollTop);
+    // 滚动事件可能一帧来好几次，用 rAF 合并成每帧一次重绘
+    if (rafRef.current === null) {
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        const cur = scrollRef.current;
+        if (cur) setScrollTop(cur.scrollTop);
+      });
+    }
     if (
       hasMore &&
       !loadingMoreRef.current &&

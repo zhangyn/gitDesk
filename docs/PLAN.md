@@ -466,6 +466,19 @@ gitdesk/
 单击 + Ctrl 点选 → `已选 2 个` → 点「暂存」→ `git diff --cached --name-only` 恰好是
 `readme.md` / `src/app.ts`，`新文件.txt` 仍是 `??`；再点「取消暂存」两者回到 ` M`。
 
+### v15：提交正文 / CI 产包 / 两处性能
+
+自检时量出来的三个缺口（都是"证据驱动"，不是拍脑袋）：
+
+| 项 | 证据 | 处理 |
+| --- | --- | --- |
+| 提交正文根本看不到 | `LOG_FORMAT` 只有 `%s`（标题），多行提交信息在 UI 里一个字都没有 | `getCommitBody`（`git show -s --format=%B`）与文件列表并发取，提交头下方渲染正文，超 3 行折叠可展开 |
+| Releases 是空的 | `GET /repos/.../releases` → `[]`，CI 里 `grep -c 'tauri build\|upload-artifact'` = 0 | CI 增加 `bundle` job：main 每次提交上传 artifact（14 天），`v*` tag 用 `softprops/action-gh-release` 自动发 Release |
+| 滚动每帧 setState、分栏每次渲染重算 | `onScroll` 直连 `setScrollTop`；`toSplitRows()` 在渲染函数里调用 | 前者用 `requestAnimationFrame` 合并成每帧一次；后者提到 `useMemo`（只在 patch 变化时算） |
+
+其余自检结论（暂未动，已记入待办）：无 lint/format 配置、`store.ts` 1605 行 / `styles.css` 3016 行、
+7 个死代码导出、verify 脚本手抄了约 40 处 git argv（已经因此漏过一个 bug）。
+
 ### 与初版方案的偏离（有意为之）
 
 | 方案原定 | 实际 | 原因 |

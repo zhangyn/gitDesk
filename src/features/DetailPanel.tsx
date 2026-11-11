@@ -31,6 +31,28 @@ function sidesLabel(kind: 'commit' | 'file', side: Side, hasParent: boolean): st
   return side === 'staged' ? 'HEAD ↔ 暂存区' : '暂存区 ↔ 工作区';
 }
 
+/** 提交正文：默认折叠成 3 行，点一下展开 */
+function CommitBody({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const lines = text.split('\n');
+  const truncated = lines.length > 3;
+  const shown = open || !truncated ? text : lines.slice(0, 3).join('\n');
+  return (
+    <div
+      className={`commit-body${truncated ? ' is-toggle' : ''}`}
+      onClick={() => {
+        if (truncated) setOpen((v) => !v);
+      }}
+      title={truncated ? (open ? '收起正文' : '展开完整正文') : undefined}
+    >
+      <pre>{shown}</pre>
+      {truncated && (
+        <span className="cb-more">{open ? '收起' : `展开全部 ${lines.length} 行`}</span>
+      )}
+    </div>
+  );
+}
+
 function WordToggle() {
   const wordDiff = useStore((s) => s.wordDiff);
   const toggle = useStore((s) => s.toggleWordDiff);
@@ -99,9 +121,17 @@ export function DetailPanel() {
     [commits, selectedSha],
   );
 
+  const commitBody = useStore((s) => s.commitBody);
   const commitTabs = useStore((s) => s.commitTabs);
   const fileTab = useStore((s) => s.fileTab);
   const activeTab = commitTabs.find((t) => t.key === fileTab) ?? null;
+  // %B 的第一行就是标题，正文从这里切出来
+  const bodyRest = useMemo(() => {
+    const raw = commitBody.replace(/\r\n/g, '\n').trim();
+    const idx = raw.indexOf('\n');
+    return idx < 0 ? '' : raw.slice(idx + 1).trim();
+  }, [commitBody]);
+
   const isStashView = target?.kind === 'stash';
   const isCompareView = target?.kind === 'compare';
   const compareInfo = useStore((s) => s.compareInfo);
@@ -175,6 +205,7 @@ export function DetailPanel() {
             <ModeToggle mode={mode} onChange={setMode} />
           </div>
 
+          {bodyRest && <CommitBody text={bodyRest} />}
         </>
       )}
 

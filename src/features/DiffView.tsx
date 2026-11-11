@@ -177,10 +177,13 @@ function SplitView({
     return m;
   }, [patch, wordMode]);
 
+  // 分栏行只在 patch 变化时算一次；否则点一行选中会重跑所有 hunk 的转换
+  const splitRows = useMemo(() => patch.hunks.map((h) => toSplitRows(h)), [patch]);
+
   return (
     <>
       {patch.hunks.map((hunk, hi) => {
-        const rows = toSplitRows(hunk);
+        const rows = splitRows[hi] ?? [];
         // 分栏模式下 hunk 选择仍按「块」操作
         const keys = hunkKeys(pi, hi, hunk, side);
         const selCount = keys.filter((k) => selection.has(k)).length;
@@ -251,6 +254,9 @@ function UnifiedView({
     patch.hunks.forEach((h, hi) => m.set(hi, buildWordMap(h)));
     return m;
   }, [patch, wordMode]);
+
+  // 分栏行只在 patch 变化时算一次；否则点一行选中会重跑所有 hunk 的转换
+  const splitRows = useMemo(() => patch.hunks.map((h) => toSplitRows(h)), [patch]);
 
   return (
     <>
