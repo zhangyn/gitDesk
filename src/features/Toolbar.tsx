@@ -302,8 +302,6 @@ export function Toolbar() {
         >
           Pop 最近一条
         </MenuItem>
-        <MenuSep />
-        <MenuItem onClick={() => void setBottomPanel('log')}>查看命令日志</MenuItem>
       </Popover>
 
       <TB icon={IconTag} label="标签" disabled={disabled || noRepo} onClick={() => void newTag()} />
@@ -329,8 +327,6 @@ export function Toolbar() {
         <MenuItem onClick={() => setLogScope('all')} hint={logScope === 'all' ? '当前' : undefined}>
           全部（含远程分支）
         </MenuItem>
-        <MenuSep />
-        <MenuItem onClick={() => setBottomPanel('log')}>查看命令日志</MenuItem>
       </Popover>
 
       <span className="spacer" />
