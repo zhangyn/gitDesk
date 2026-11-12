@@ -37,7 +37,10 @@ export function StatusBar() {
       <span className="spacer" />
 
       {last && !busy && (
-        <span className={`sb-item dim mono${last.code === 0 ? '' : ' danger'}`} title={last.argv.join(' ')}>
+        <span
+          className={`sb-item dim mono${last.code === 0 ? '' : ' danger'}`}
+          title={last.argv.join(' ')}
+        >
           上次 {last.durationMs}ms
         </span>
       )}

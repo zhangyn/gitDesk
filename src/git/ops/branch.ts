@@ -38,11 +38,7 @@ export async function rebaseOnto(repoPath: string, name: string) {
  * 把远程分支拿到本地：不存在就 --track 建一个并切过去；已存在就直接切过去并重设上游。
  * remoteRef 传完整形式（origin/feature-x）。
  */
-export async function createTrackingBranch(
-  repoPath: string,
-  localName: string,
-  remoteRef: string,
-) {
+export async function createTrackingBranch(repoPath: string, localName: string, remoteRef: string) {
   const exists = await runGit(['rev-parse', '--verify', '--quiet', `refs/heads/${localName}`], {
     cwd: repoPath,
     quiet: true,
@@ -56,10 +52,6 @@ export async function createTrackingBranch(
     cwd: repoPath,
     timeoutMs: 120_000,
   });
-}
-
-export async function renameBranch(repoPath: string, from: string, to: string) {
-  return runGit(['branch', '-m', from, to], { cwd: repoPath });
 }
 
 /** 检测进行中的多步操作（merge / rebase / cherry-pick / revert），用于 UI 提示 */
@@ -108,27 +100,6 @@ export async function revertContinue(repoPath: string) {
 
 export async function revertAbort(repoPath: string) {
   return runGit(['revert', '--abort'], { cwd: repoPath, timeoutMs: 300_000 });
-}
-
-/** 逐条列出 A..B 的提交（对比视图里展示"中间有哪些提交"） */
-export async function listRangeCommits(
-  repoPath: string,
-  a: string,
-  b: string,
-  limit = 200,
-): Promise<Array<{ sha: string; subject: string; author: string }>> {
-  const res = await runGit(
-    ['log', '--topo-order', '-n', String(limit), '--format=%H%x1f%an%x1f%s', `${a}..${b}`],
-    { cwd: repoPath, quiet: true, timeoutMs: 60_000 },
-  );
-  if (res.code !== 0) return [];
-  return res.stdout
-    .split(/\r?\n/)
-    .filter((l) => l.trim())
-    .map((l) => {
-      const [sha, author, subject] = l.split('\x1f');
-      return { sha, author: author ?? '', subject: subject ?? '' };
-    });
 }
 
 /* ------------------------------------------------- 挑拣 / 还原单个提交 */

@@ -101,15 +101,10 @@ export function DetailPanel() {
   const conflictSides = useStore((s) => s.conflictSides);
   const status = useStore((s) => s.status);
   const [mode, setMode] = useDiffMode();
-  const wordDiff = useStore((s) => s.wordDiff);
-  const toggleWordDiff = useStore((s) => s.toggleWordDiff);
   const cherryPickOp = useStore((s) => s.cherryPickOp);
   const revertOp = useStore((s) => s.revertOp);
 
-  const hunkCount = useMemo(
-    () => patches.reduce((n, p) => n + p.hunks.length, 0),
-    [patches],
-  );
+  const hunkCount = useMemo(() => patches.reduce((n, p) => n + p.hunks.length, 0), [patches]);
   // 中间面板与双击弹窗共用同一套导航；换文件/换提交就回到第 1 块
   const nav = useHunkNav(
     hunkCount,
@@ -184,7 +179,9 @@ export function DetailPanel() {
             <span className="meta-item mono">
               {DATE_FMT.format(new Date(commit.authorDate * 1000))}
             </span>
-            <span className="sides-label">· {sidesLabel('commit', side, commit.parents.length > 0)}</span>
+            <span className="sides-label">
+              · {sidesLabel('commit', side, commit.parents.length > 0)}
+            </span>
             <span className="spacer" />
             <button
               className="btn small"

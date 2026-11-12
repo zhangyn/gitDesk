@@ -37,7 +37,11 @@ function eq(name: string, actual: unknown, expected: unknown): void {
 
 const dir = mkdtempSync(join(tmpdir(), 'gitdesk-verify-'));
 const git = (args: string[]): string =>
-  execFileSync('git', [...BASE, ...args], { cwd: dir, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  execFileSync('git', [...BASE, ...args], {
+    cwd: dir,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
 
 const write = (rel: string, content: string): void => {
   const abs = join(dir, rel);
@@ -77,7 +81,11 @@ try {
   const commits = parseLog(logOut);
 
   eq('log: 提交数量', commits.length, 4);
-  check('log: 全部 sha 非空', commits.every((c) => /^[0-9a-f]{40}$/.test(c.sha)), commits.map((c) => c.sha));
+  check(
+    'log: 全部 sha 非空',
+    commits.every((c) => /^[0-9a-f]{40}$/.test(c.sha)),
+    commits.map((c) => c.sha),
+  );
   check(
     'log: 中文提交信息未被转义',
     commits.some((c) => c.subject === '初始提交：中文 & emoji 🚀'),
@@ -94,7 +102,11 @@ try {
   check('log: 根提交没有 parent', commits[commits.length - 1].parents.length === 0);
 
   const decorated = commits.find((c) => c.refs.some((r) => r.startsWith('tag: v1.0')));
-  check('log: tag 装饰解析成功', decorated !== undefined, commits.map((c) => c.refs));
+  check(
+    'log: tag 装饰解析成功',
+    decorated !== undefined,
+    commits.map((c) => c.refs),
+  );
   const head = commits.find((c) => c.refs.some((r) => r.startsWith('HEAD ->')));
   check('log: HEAD -> main 装饰解析成功', head !== undefined);
 
@@ -120,11 +132,7 @@ try {
     'graph: 每个提交的 sha 恰好出现一次',
     new Set(rows.map((r) => r.sha)).size === commits.length,
   );
-  check(
-    'graph: 首行泳道为 0',
-    rows[0]?.lane === 0,
-    rows[0]?.lane,
-  );
+  check('graph: 首行泳道为 0', rows[0]?.lane === 0, rows[0]?.lane);
   const mergeRow = rows.find((r) => r.sha === merge?.sha);
   check('graph: merge 行有 2 条向下边', (mergeRow?.edges.length ?? 0) >= 2, mergeRow?.edges);
 
@@ -169,8 +177,16 @@ try {
     git(['status', '--porcelain=v2', '-z', '--branch', '--untracked-files=normal']),
   );
   const unmerged = conflictStatus.entries.find((e) => e.kind === 'unmerged' && e.path === 'a.txt');
-  check('status: 冲突条目被识别', unmerged !== undefined, conflictStatus.entries.map((e) => [e.path, e.kind]));
-  check('status: 冲突暂存三段 stage 已解析', (unmerged?.stages?.m1 ?? '').length > 0, unmerged?.stages);
+  check(
+    'status: 冲突条目被识别',
+    unmerged !== undefined,
+    conflictStatus.entries.map((e) => [e.path, e.kind]),
+  );
+  check(
+    'status: 冲突暂存三段 stage 已解析',
+    (unmerged?.stages?.m1 ?? '').length > 0,
+    unmerged?.stages,
+  );
   git(['merge', '--abort']);
 
   /* ---------------------------------------------------------------- diff */
@@ -178,7 +194,15 @@ try {
   write('a.txt', 'line1\nline2\nline3\n');
   git(['commit', '-q', '-am', 'reset a.txt for diff test']);
   write('a.txt', 'line1\nline2 CHANGED\nline3\n');
-  const diffOut = git(['diff', '--no-color', '--no-ext-diff', '-U3', '--no-renames', '--', 'a.txt']);
+  const diffOut = git([
+    'diff',
+    '--no-color',
+    '--no-ext-diff',
+    '-U3',
+    '--no-renames',
+    '--',
+    'a.txt',
+  ]);
   const patches = parsePatches(diffOut);
   eq('diff: 单个文件 patch', patches.length, 1);
   eq('diff: 文件路径', patches[0]?.newPath, 'a.txt');
@@ -198,7 +222,7 @@ try {
   const ctx = hunk?.lines.filter((l) => l.kind === 'ctx') ?? [];
   check(
     'diff: 上下文行号连续',
-    ctx.every((l, i) => (l.oldNo ?? 0) >= 1 && (l.newNo ?? 0) >= 1 && l.oldNo !== null),
+    ctx.every((l) => (l.oldNo ?? 0) >= 1 && (l.newNo ?? 0) >= 1 && l.oldNo !== null),
     ctx,
   );
 
@@ -218,7 +242,11 @@ try {
   const addedPatch = synthesizeAdded('x\ny\n', 'brand-new.txt', false);
   eq('synthetic: hunks', addedPatch.hunks.length, 1);
   eq('synthetic: 行数', addedPatch.hunks[0].lines.length, 2);
-  eq('synthetic: 全部为 add', addedPatch.hunks[0].lines.every((l) => l.kind === 'add'), true);
+  eq(
+    'synthetic: 全部为 add',
+    addedPatch.hunks[0].lines.every((l) => l.kind === 'add'),
+    true,
+  );
   eq('synthetic: newPath', addedPatch.newPath, 'brand-new.txt');
 
   /* ---------------------------------------------------------------- name-status */

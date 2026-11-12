@@ -18,10 +18,7 @@ export function DiffModal() {
   const loading = useStore((s) => s.diffLoading);
   const conflictSides = useStore((s) => s.conflictSides);
 
-  const hunkCount = useMemo(
-    () => patches.reduce((n, p) => n + p.hunks.length, 0),
-    [patches],
-  );
+  const hunkCount = useMemo(() => patches.reduce((n, p) => n + p.hunks.length, 0), [patches]);
   // 和中间面板共用同一套差异块导航；换文件/换提交自动回到第 1 块
   const nav = useHunkNav(
     open ? hunkCount : 0,
@@ -52,7 +49,8 @@ export function DiffModal() {
 
   if (!open || !target) return null;
 
-  const mode: DiffMode = localStorage.getItem('gitdesk.diffMode') === 'unified' ? 'unified' : 'split';
+  const mode: DiffMode =
+    localStorage.getItem('gitdesk.diffMode') === 'unified' ? 'unified' : 'split';
   const interactive = !conflictSides && target.kind === 'file';
   const title =
     target.kind === 'commit'
@@ -79,8 +77,8 @@ export function DiffModal() {
                 : target.kind === 'compare'
                   ? '左侧 ↔ 右侧（净差异）'
                   : side === 'staged'
-                  ? 'HEAD ↔ 暂存区'
-                  : '暂存区 ↔ 工作区'}
+                    ? 'HEAD ↔ 暂存区'
+                    : '暂存区 ↔ 工作区'}
           </span>
           <span className="spacer" />
           <HunkNav count={hunkCount} index={nav.index} onGo={nav.go} />

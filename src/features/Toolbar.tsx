@@ -209,7 +209,9 @@ export function Toolbar() {
 
       <Popover
         width={190}
-        trigger={<TB icon={IconPull} label="拉取" caret disabled={disabled || noRepo || !hasRemote} />}
+        trigger={
+          <TB icon={IconPull} label="拉取" caret disabled={disabled || noRepo || !hasRemote} />
+        }
       >
         <MenuItem onClick={() => void pullOp('ff-only')}>仅快进（--ff-only）</MenuItem>
         <MenuItem onClick={() => void pullOp('rebase')}>变基（--rebase）</MenuItem>
@@ -220,7 +222,9 @@ export function Toolbar() {
 
       <Popover
         width={190}
-        trigger={<TB icon={IconPush} label="推送" caret disabled={disabled || noRepo || !hasRemote} />}
+        trigger={
+          <TB icon={IconPush} label="推送" caret disabled={disabled || noRepo || !hasRemote} />
+        }
       >
         <MenuItem onClick={() => void pushOp(false)}>推送当前分支</MenuItem>
         <MenuItem onClick={() => void pushOp(true)} danger>
@@ -266,19 +270,28 @@ export function Toolbar() {
 
       <span className="tb-sep" />
 
-      <Popover width={250} trigger={<TB icon={IconMerge} label="合并" caret disabled={disabled || noRepo} />}>
+      <Popover
+        width={250}
+        trigger={<TB icon={IconMerge} label="合并" caret disabled={disabled || noRepo} />}
+      >
         <div className="menu-title">合并到 {branch ?? '当前分支'}</div>
         <BranchPicker exclude={branch} onPick={(n) => void mergeBranchOp(n)} />
       </Popover>
 
-      <Popover width={250} trigger={<TB icon={IconRebase} label="变基" caret disabled={disabled || noRepo} />}>
+      <Popover
+        width={250}
+        trigger={<TB icon={IconRebase} label="变基" caret disabled={disabled || noRepo} />}
+      >
         <div className="menu-title">把 {branch ?? '当前分支'} 变基到</div>
         <BranchPicker exclude={branch} onPick={(n) => void rebaseOntoOp(n)} />
       </Popover>
 
       <span className="tb-sep" />
 
-      <Popover width={190} trigger={<TB icon={IconStash} label="Stash" caret disabled={disabled || noRepo} />}>
+      <Popover
+        width={190}
+        trigger={<TB icon={IconStash} label="Stash" caret disabled={disabled || noRepo} />}
+      >
         <MenuItem onClick={() => void newStash()} disabled={counts.total === 0}>
           保存 Stash
         </MenuItem>
@@ -313,10 +326,7 @@ export function Toolbar() {
         >
           本地分支 + HEAD
         </MenuItem>
-        <MenuItem
-          onClick={() => setLogScope('all')}
-          hint={logScope === 'all' ? '当前' : undefined}
-        >
+        <MenuItem onClick={() => setLogScope('all')} hint={logScope === 'all' ? '当前' : undefined}>
           全部（含远程分支）
         </MenuItem>
         <MenuSep />

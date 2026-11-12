@@ -92,9 +92,11 @@ export function CredentialDialog() {
         </label>
 
         <div className="modal-body cred-hint">
-          GitHub 从 2021 起不接受账号密码推送，请用 <span className="mono">Personal Access Token</span>
+          GitHub 从 2021 起不接受账号密码推送，请用{' '}
+          <span className="mono">Personal Access Token</span>
           （Settings → Developer settings → Tokens，勾 <span className="mono">repo</span>）。
-          也可以改成 SSH 远端：<span className="mono">git remote set-url origin git@github.com:…</span>
+          也可以改成 SSH 远端：
+          <span className="mono">git remote set-url origin git@github.com:…</span>
         </div>
 
         <div className="modal-actions">

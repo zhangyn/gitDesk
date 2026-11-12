@@ -1,11 +1,6 @@
 import { runGit } from '../runner';
 
-export async function createTag(
-  repoPath: string,
-  name: string,
-  message: string,
-  at?: string,
-) {
+export async function createTag(repoPath: string, name: string, message: string, at?: string) {
   const args = ['tag'];
   if (message.trim()) {
     args.push('-a', name, '-m', message.trim());

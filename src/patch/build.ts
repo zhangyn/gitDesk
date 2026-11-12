@@ -55,10 +55,7 @@ export function hunkKeys(
   return keys;
 }
 
-function headerFor(
-  patch: FilePatch,
-  flags: { fullNew: boolean; fullDelete: boolean },
-): string[] {
+function headerFor(patch: FilePatch, flags: { fullNew: boolean; fullDelete: boolean }): string[] {
   const lines: string[] = [];
   const aPath = flags.fullNew ? patch.newPath : patch.oldPath;
   const bPath = flags.fullDelete ? patch.oldPath : patch.newPath;

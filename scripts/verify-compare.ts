@@ -140,7 +140,16 @@ try {
   check('两次提交对比：中间提交数 > 1', midCount > 1, midCount);
 
   // 单文件 diff
-  const fileDiff = git(['diff', '--no-color', '--no-ext-diff', '-U3', base, featureTip, '--', 'a.txt']);
+  const fileDiff = git([
+    'diff',
+    '--no-color',
+    '--no-ext-diff',
+    '-U3',
+    base,
+    featureTip,
+    '--',
+    'a.txt',
+  ]);
   check('单文件对比：输出含 diff --git', fileDiff.startsWith('diff --git'), fileDiff.slice(0, 40));
   check('单文件对比：含 +/- 行', /^[+-][^+-]/m.test(fileDiff));
 
@@ -276,19 +285,15 @@ try {
   eq('文件搜索：能搜到未合并分支上的提交', soloHits.length, 1);
   eq('文件搜索：命中的是 solo-only 的提交', soloHits[0]?.sha?.slice(0, 7), soloSha.slice(0, 7));
 
-  const soloMiss = tryGit([
-    'log',
-    '-n',
-    '20',
-    `--format=${FORMAT}`,
-    'HEAD',
-    '--',
-    '*solo.txt*',
-  ]);
+  const soloMiss = tryGit(['log', '-n', '20', `--format=${FORMAT}`, 'HEAD', '--', '*solo.txt*']);
   eq('对照：只搜 HEAD 时搜不到（证明范围参数真的生效）', parseLog(soloMiss.out).length, 0);
 
   // rev 解析：合法/非法
-  eq('rev 解析：HEAD 可解析', tryGit(['rev-parse', '--verify', '--quiet', 'HEAD^{commit}']).code, 0);
+  eq(
+    'rev 解析：HEAD 可解析',
+    tryGit(['rev-parse', '--verify', '--quiet', 'HEAD^{commit}']).code,
+    0,
+  );
   eq(
     'rev 解析：不存在的分支被拒绝',
     tryGit(['rev-parse', '--verify', '--quiet', 'no-such-branch^{commit}']).code,

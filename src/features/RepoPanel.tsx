@@ -37,7 +37,11 @@ export function RepoPanel() {
           {recent.map((r) => {
             const active = r.path === repo?.path;
             return (
-              <div key={r.path} className={`repo-item${active ? ' is-current' : ''}`} title={r.path}>
+              <div
+                key={r.path}
+                className={`repo-item${active ? ' is-current' : ''}`}
+                title={r.path}
+              >
                 <button
                   className="repo-item-main"
                   disabled={busy !== null}

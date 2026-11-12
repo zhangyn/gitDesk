@@ -25,12 +25,7 @@ import {
   type LogScope,
   type LogSearch,
 } from './git/ops/log';
-import {
-  compareFileDiff,
-  compareFiles,
-  compareStat,
-  resolveRev,
-} from './git/ops/compare';
+import { compareFileDiff, compareFiles, compareStat, resolveRev } from './git/ops/compare';
 import { getRefs } from './git/ops/refs';
 import { getCommitDiff, getUntrackedDiff, getWorktreeDiff } from './git/ops/diff';
 import {
@@ -226,7 +221,6 @@ interface AppStore {
   setLogScope: (scope: LogScope) => void;
   /** 提交历史搜索（null = 不过滤） */
   logQuery: LogSearch | null;
-  logSearching: boolean;
   /** 变更列表里被勾选的文件（多选，供工具栏「暂存 / 取消暂存」使用） */
   pickedPaths: string[];
   /** Shift 连选的锚点 */
@@ -363,7 +357,6 @@ const EMPTY_REPO_STATE = {
   commitBody: '',
   logScope: 'local' as LogScope,
   logQuery: null,
-  logSearching: false,
   logLimit: LOG_PAGE,
   pickedPaths: [] as string[],
   fileAnchor: null,
@@ -434,11 +427,7 @@ export const useStore = create<AppStore>()((set, get) => {
   }
 
   /** 统一的写操作包装：backup → 执行 → 刷新 → 重载当前 diff */
-  async function mutate(
-    label: string,
-    backup: boolean,
-    fn: () => Promise<void>,
-  ): Promise<boolean> {
+  async function mutate(label: string, backup: boolean, fn: () => Promise<void>): Promise<boolean> {
     const repo = get().repo;
     if (!repo) return false;
     set({ busy: label, error: null });
@@ -711,8 +700,8 @@ export const useStore = create<AppStore>()((set, get) => {
       set({ busy: '刷新…', error: null });
       try {
         const search = get().logQuery;
-        const [status, commits, refs, stashes, backups, ongoing, remotes, stat] =
-          await Promise.all([
+        const [status, commits, refs, stashes, backups, ongoing, remotes, stat] = await Promise.all(
+          [
             getStatus(repo.path),
             search && search.text.trim()
               ? searchLog(repo.path, get().logLimit, search, get().logScope)
@@ -727,7 +716,8 @@ export const useStore = create<AppStore>()((set, get) => {
               quiet: true,
               timeoutMs: 30_000,
             }),
-          ]);
+          ],
+        );
         const statText = stat.stdout.trim();
         const statFiles = /(\d+) file/.exec(statText);
         const statIns = /(\d+) insertion/.exec(statText);
@@ -814,19 +804,12 @@ export const useStore = create<AppStore>()((set, get) => {
 
     setLogQuery(mode, text) {
       // 换搜索条件就回到第一页
-      set({
-        logQuery: text.trim() ? { mode, text } : null,
-        logSearching: Boolean(text.trim()),
-        logLimit: LOG_PAGE,
-  pickedPaths: [] as string[],
-  fileAnchor: null,
-  wordDiff: localStorage.getItem('gitdesk.wordDiff') !== '0',
-      });
+      set({ logQuery: text.trim() ? { mode, text } : null, logLimit: LOG_PAGE });
       void get().refresh();
     },
 
     clearLogQuery() {
-      set({ logQuery: null, logSearching: false, logLimit: LOG_PAGE });
+      set({ logQuery: null, logLimit: LOG_PAGE });
       void get().refresh();
     },
 
@@ -854,7 +837,7 @@ export const useStore = create<AppStore>()((set, get) => {
       const next = order ? order.filter((p) => cur.has(p)) : [...cur];
       set({
         pickedPaths: next,
-        fileAnchor: mode === 'range' ? get().fileAnchor ?? path : path,
+        fileAnchor: mode === 'range' ? (get().fileAnchor ?? path) : path,
       });
     },
 
@@ -1090,10 +1073,8 @@ export const useStore = create<AppStore>()((set, get) => {
       const subset = new Set(keys);
       const { patch, count } = buildSelectedPatch(patches, subset, side);
       if (count === 0) return;
-      await mutate(
-        undo ? `取消暂存 ${count} 行` : `暂存 ${count} 行`,
-        false,
-        () => applyPatchToIndex(getRepoPath(), patch, undo),
+      await mutate(undo ? `取消暂存 ${count} 行` : `暂存 ${count} 行`, false, () =>
+        applyPatchToIndex(getRepoPath(), patch, undo),
       );
     },
 
@@ -1599,7 +1580,11 @@ export const useStore = create<AppStore>()((set, get) => {
 });
 
 /** 暂存/未暂存条目数（给工具栏和面板显示） */
-export function countEntries(s: RepoStatus | null): { total: number; staged: number; worktree: number } {
+export function countEntries(s: RepoStatus | null): {
+  total: number;
+  staged: number;
+  worktree: number;
+} {
   if (!s) return { total: 0, staged: 0, worktree: 0 };
   let staged = 0;
   let worktree = 0;

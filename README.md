@@ -94,6 +94,11 @@ GitDesk.exe D:\path\to\repo
 | — | 提交历史右上角：按「说明 / 文件」搜索 |
 | — | 工具栏「对比」：任意两个分支或提交对比；分支行 `⧉` 一键与当前分支对比 |
 | `Esc` | 关闭面板 / 弹窗 |
+| `↑` `↓` / `k` `j` | 在提交历史或变更列表里移动（列表需先点一下获得焦点） |
+| `Space` | 在变更列表里切换当前文件的勾选 |
+| `Enter` | 打开当前文件/提交的放大 diff 窗口 |
+| `+` / `-` | 暂存 / 取消暂存勾选的文件 |
+| `PageUp` `PageDown` `Home` `End` | 提交历史翻页与首尾 |
 
 ## 设计取舍
 
@@ -192,6 +197,8 @@ npm run verify     # 154/154
 
 ```bash
 npm install
+npm run lint       # ESLint（含 react-hooks 规则）
+npm run format     # Prettier 格式化；npm run format:check 只检查
 npm run icons      # 生成 src-tauri/icons/*（零依赖，node 内置 zlib）
 npm run app:dev    # tauri dev：vite + cargo
 npm run typecheck  # tsc --noEmit

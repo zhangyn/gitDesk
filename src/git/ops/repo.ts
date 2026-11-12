@@ -5,9 +5,7 @@ import { runGit } from '../runner';
 export async function openRepo(dir: string): Promise<RepoInfo> {
   const bare = await runGit(['rev-parse', '--is-bare-repository'], { cwd: dir, quiet: true });
   if (bare.code !== 0) {
-    throw new Error(
-      `不是 Git 仓库：${dir}\n${(bare.stderr || bare.stdout).trim()}`.trim(),
-    );
+    throw new Error(`不是 Git 仓库：${dir}\n${(bare.stderr || bare.stdout).trim()}`.trim());
   }
   if (bare.stdout.trim() === 'true') {
     throw new Error('暂不支持 bare 仓库（M0 仅支持带工作区的仓库）');

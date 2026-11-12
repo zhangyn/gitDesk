@@ -108,7 +108,10 @@ try {
   eq('  块 1 对方内容', parsed.conflicts[0].theirs, ['T1']);
   eq('  块 2 我方内容', parsed.conflicts[1].ours, ['O9', 'L10']);
   eq('  块 2 对方内容', parsed.conflicts[1].theirs, ['L9', 'T10']);
-  check('  merge 风格无 base', parsed.conflicts.every((c) => c.hasBase === false));
+  check(
+    '  merge 风格无 base',
+    parsed.conflicts.every((c) => c.hasBase === false),
+  );
 
   // 三段 stage 都应该在
   const stages = ['1', '2', '3'].map((s) => tryGit(['show', `:${s}:${file}`]).code);
@@ -124,7 +127,11 @@ try {
   eq('  全我方 = ours 分支内容', resolveConflict(parsed, allOurs), `${oursSide.join('\n')}\n`);
 
   const allTheirs: Record<number, Decision> = { 1: 'theirs', 2: 'theirs' };
-  eq('  全对方 = theirs 分支内容', resolveConflict(parsed, allTheirs), `${theirsSide.join('\n')}\n`);
+  eq(
+    '  全对方 = theirs 分支内容',
+    resolveConflict(parsed, allTheirs),
+    `${theirsSide.join('\n')}\n`,
+  );
 
   const mixed: Record<number, Decision> = { 1: 'ours', 2: 'theirs' };
   eq(
@@ -151,12 +158,23 @@ try {
   console.log('\n[3] 写回工作区 + git add 标记解决');
   writeFileSync(join(dir, file), resolveConflict(parsed, mixed));
   const statusAfterResolve = git(['status', '--porcelain=v2', '-z', '--branch']);
-  check('  未 add 前仍是未合并状态', statusAfterResolve.includes('\0u ') || statusAfterResolve.includes('u UU'), statusAfterResolve.slice(0, 80));
+  check(
+    '  未 add 前仍是未合并状态',
+    statusAfterResolve.includes('\0u ') || statusAfterResolve.includes('u UU'),
+    statusAfterResolve.slice(0, 80),
+  );
 
   git(['add', '--', file]);
   const statusAfterAdd = git(['status', '--porcelain=v2', '-z', '--branch']);
-  check('  add 后不再是 unmerged', !/^u /m.test(statusAfterAdd) && !statusAfterAdd.includes('\0u '));
-  eq('  工作区内容 = 合成结果', readFileSync(join(dir, file), 'utf8'), resolveConflict(parsed, mixed));
+  check(
+    '  add 后不再是 unmerged',
+    !/^u /m.test(statusAfterAdd) && !statusAfterAdd.includes('\0u '),
+  );
+  eq(
+    '  工作区内容 = 合成结果',
+    readFileSync(join(dir, file), 'utf8'),
+    resolveConflict(parsed, mixed),
+  );
 
   tryGit(['merge', '--abort']);
   check('  merge --abort 后回到干净状态', git(['status', '--porcelain']).trim() === '');

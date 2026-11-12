@@ -26,20 +26,17 @@ export async function resolveRev(repoPath: string, rev: string): Promise<string 
  * 与 DAG 关系无关：`git diff A B` 就是两棵树的净差异，
  * 所以「分支 A ↔ 分支 B」和「提交 A ↔ 提交 B（中间隔很多次提交）」是同一套实现。
  */
-export async function compareFiles(
-  repoPath: string,
-  a: string,
-  b: string,
-): Promise<CompareResult> {
+export async function compareFiles(repoPath: string, a: string, b: string): Promise<CompareResult> {
   const [aSha, bSha] = await Promise.all([resolveRev(repoPath, a), resolveRev(repoPath, b)]);
   if (!aSha) throw new Error(`无法解析左侧版本：${a}`);
   if (!bSha) throw new Error(`无法解析右侧版本：${b}`);
 
   const [nameStatus, count] = await Promise.all([
-    runGitChecked(
-      ['diff', '--name-status', '-z', '--no-renames', aSha, bSha],
-      { cwd: repoPath, quiet: true, timeoutMs: 60_000 },
-    ),
+    runGitChecked(['diff', '--name-status', '-z', '--no-renames', aSha, bSha], {
+      cwd: repoPath,
+      quiet: true,
+      timeoutMs: 60_000,
+    }),
     runGit(['rev-list', '--count', `${aSha}..${bSha}`], {
       cwd: repoPath,
       quiet: true,
@@ -71,10 +68,10 @@ export async function compareFileDiff(
   bSha: string,
   path: string,
 ): Promise<FilePatch[]> {
-  const res = await runGit(
-    ['diff', '--no-color', '--no-ext-diff', '-U3', aSha, bSha, '--', path],
-    { cwd: repoPath, timeoutMs: 60_000 },
-  );
+  const res = await runGit(['diff', '--no-color', '--no-ext-diff', '-U3', aSha, bSha, '--', path], {
+    cwd: repoPath,
+    timeoutMs: 60_000,
+  });
   return parsePatches(res.stdout);
 }
 

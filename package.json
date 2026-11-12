@@ -13,7 +13,10 @@
     "verify": "esbuild scripts/verify-parsers.ts --bundle --platform=node --format=esm --outfile=.tmp/verify-parsers.mjs --log-level=warning && esbuild scripts/verify-staging.ts --bundle --platform=node --format=esm --outfile=.tmp/verify-staging.mjs --log-level=warning && esbuild scripts/verify-remote.ts --bundle --platform=node --format=esm --outfile=.tmp/verify-remote.mjs --log-level=warning && node .tmp/verify-parsers.mjs && node .tmp/verify-staging.mjs && esbuild scripts/verify-conflict.ts --bundle --platform=node --format=esm --outfile=.tmp/verify-conflict.mjs --log-level=warning && node .tmp/verify-remote.mjs && esbuild scripts/verify-compare.ts --bundle --platform=node --format=esm --outfile=.tmp/verify-compare.mjs --log-level=warning && node .tmp/verify-conflict.mjs && node .tmp/verify-compare.mjs && esbuild scripts/verify-word.ts --bundle --platform=node --format=esm --outfile=.tmp/verify-word.mjs --log-level=warning && node .tmp/verify-word.mjs",
     "tauri": "tauri",
     "app:dev": "tauri dev",
-    "app:build": "tauri build"
+    "app:build": "tauri build",
+    "lint": "eslint src scripts --max-warnings 999",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"scripts/**/*.ts\" \"*.{json,js}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"scripts/**/*.ts\" \"*.{json,js}\""
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",
@@ -23,12 +26,17 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@tauri-apps/cli": "^2.1.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "esbuild": "^0.28.2",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "prettier": "^3.10.0",
     "typescript": "^5.6.3",
+    "typescript-eslint": "^8.72.2",
     "vite": "^5.4.11"
   }
 }

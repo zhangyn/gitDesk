@@ -203,8 +203,20 @@ export function Logo({ size = 46, className }: { size?: number; className?: stri
         </linearGradient>
       </defs>
       <rect x="1.6" y="1.6" width="42.8" height="42.8" rx="10.1" fill="url(#gd-logo-bg)" />
-      <path d="M15.6 9.2 V31.3" stroke="#7ee787" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-      <path d="M15.6 31.3 H33.1" stroke="#58a6ff" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+      <path
+        d="M15.6 9.2 V31.3"
+        stroke="#7ee787"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <path
+        d="M15.6 31.3 H33.1"
+        stroke="#58a6ff"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        fill="none"
+      />
       <circle cx="15.6" cy="9.2" r="3.45" fill="#7ee787" />
       <circle cx="15.6" cy="31.3" r="3.45" fill="#58a6ff" />
       <circle cx="15.6" cy="31.3" r="1.45" fill="#161a24" />

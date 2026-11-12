@@ -20,11 +20,7 @@ interface ReadResult {
 }
 
 /** `git show :<stage>:<path>`，stage 不存在时返回 null（exit 128） */
-async function showStage(
-  repoPath: string,
-  stage: 1 | 2 | 3,
-  path: string,
-): Promise<string | null> {
+async function showStage(repoPath: string, stage: 1 | 2 | 3, path: string): Promise<string | null> {
   const res = await runGit(['show', `:${stage}:${path}`], {
     cwd: repoPath,
     quiet: true,
@@ -33,10 +29,7 @@ async function showStage(
   return res.code === 0 ? res.stdout : null;
 }
 
-export async function loadConflictSides(
-  repoPath: string,
-  path: string,
-): Promise<ConflictSides> {
+export async function loadConflictSides(repoPath: string, path: string): Promise<ConflictSides> {
   const [base, ours, theirs] = await Promise.all([
     showStage(repoPath, 1, path),
     showStage(repoPath, 2, path),

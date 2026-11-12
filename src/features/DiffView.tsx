@@ -75,11 +75,7 @@ function HunkAction({ keys, side }: { keys: string[]; side: Side }) {
   return (
     <button
       className="hunk-act"
-      title={
-        undo
-          ? '只取消暂存这一块的改动'
-          : '只暂存这一块的改动 —— 文件里其它改动保留在工作区'
-      }
+      title={undo ? '只取消暂存这一块的改动' : '只暂存这一块的改动 —— 文件里其它改动保留在工作区'}
       onClick={(e) => {
         e.stopPropagation();
         void stageKeys(keys, undo);
@@ -255,9 +251,6 @@ function UnifiedView({
     return m;
   }, [patch, wordMode]);
 
-  // 分栏行只在 patch 变化时算一次；否则点一行选中会重跑所有 hunk 的转换
-  const splitRows = useMemo(() => patch.hunks.map((h) => toSplitRows(h)), [patch]);
-
   return (
     <>
       {patch.hunks.map((hunk, hi) => {
@@ -342,7 +335,8 @@ export function DiffView({
 }) {
   if (loading) return <div className="diff-empty">加载中…</div>;
   if (!hasTarget) return <div className="diff-empty">选择左侧的提交或文件查看差异</div>;
-  if (patches.length === 0) return <div className="diff-empty">{emptyText ?? '没有可显示的差异'}</div>;
+  if (patches.length === 0)
+    return <div className="diff-empty">{emptyText ?? '没有可显示的差异'}</div>;
 
   return (
     <div className={`diff${mode === 'split' ? ' is-split' : ''}`} ref={containerRef}>
@@ -350,13 +344,13 @@ export function DiffView({
         <div className="diff-file" key={`${p.newPath}-${pi}`}>
           {/* 只有一个文件时，路径已经在面板标题里了，不要再重复一遍 */}
           {patches.length > 1 && (
-          <div className="diff-file-head">
-            <span className="mono path">{p.newPath}</span>
-            {p.isNew && <span className="badge badge-add">新增</span>}
-            {p.isDeleted && <span className="badge badge-del">删除</span>}
-            {p.isBinary && <span className="badge">二进制</span>}
-            {p.synthetic && <span className="badge">未跟踪</span>}
-          </div>
+            <div className="diff-file-head">
+              <span className="mono path">{p.newPath}</span>
+              {p.isNew && <span className="badge badge-add">新增</span>}
+              {p.isDeleted && <span className="badge badge-del">删除</span>}
+              {p.isBinary && <span className="badge">二进制</span>}
+              {p.synthetic && <span className="badge">未跟踪</span>}
+            </div>
           )}
 
           {p.isBinary && p.hunks.length === 0 && (

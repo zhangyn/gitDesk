@@ -479,6 +479,20 @@ gitdesk/
 其余自检结论（暂未动，已记入待办）：无 lint/format 配置、`store.ts` 1605 行 / `styles.css` 3016 行、
 7 个死代码导出、verify 脚本手抄了约 40 处 git argv（已经因此漏过一个 bug）。
 
+### v16：工程卫生 + 键盘操作
+
+自检发现的缺口，这一轮把能一次做完的都做了：
+
+| 项 | 之前 | 现在 |
+| --- | --- | --- |
+| 代码规范 | 没有 lint / format / editorconfig（开源仓库最扎眼的一条） | `eslint.config.js`（flat + typescript-eslint + react-hooks）、`.prettierrc.json`、`.editorconfig`；npm 脚本 `lint` / `format` / `format:check`；CI 里两者都跑 |
+| 死代码 | 7 个导出 0 引用 | 删掉 `countStaged` / `currentHeadSha` / `laneStats` / `renameBranch` / `listRangeCommits` / 未读的 `logSearching`；顺手删掉 DiffView 里一个重复的 memo、DetailPanel 里两个未用的订阅 |
+| 键盘 | 全项目 `tabIndex` 出现 0 次，列表只能用鼠标 | 提交历史与变更列表都可获得焦点：`↑↓/j k` 移动、`Space` 勾选、`Enter` 放大、`+/-` 暂存/取消、`PageUp/Down/Home/End` 翻页；`:focus-visible` 才画高亮框 |
+| 侧栏默认状态 | 标签、Stash 有数据就自动展开 | 标签 / Stash / 备份默认折叠，本地分支保持展开（高频） |
+
+一条教训：删 `listRangeCommits` 时用"截断到某注释处"的方式，把后面的 `cherryPick` / `revertCommit`
+一起截掉了 —— tsc 立刻报错才发现。以后删整段代码要按函数边界删，并马上跑一次 `tsc`。
+
 ### 与初版方案的偏离（有意为之）
 
 | 方案原定 | 实际 | 原因 |

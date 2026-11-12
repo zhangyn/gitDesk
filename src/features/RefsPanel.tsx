@@ -50,15 +50,7 @@ function remoteToLocal(name: string): string {
 }
 
 /** 相对上游的领先/落后标记：>1 表示本地多 1 个提交，<2 表示本地少 2 个 */
-function TrackBadge({
-  ahead,
-  behind,
-  gone,
-}: {
-  ahead: number;
-  behind: number;
-  gone: boolean;
-}) {
+function TrackBadge({ ahead, behind, gone }: { ahead: number; behind: number; gone: boolean }) {
   if (gone) return <span className="tr tr-gone">上游已删</span>;
   if (ahead === 0 && behind === 0) return null;
   return (
@@ -218,7 +210,7 @@ export function RefsPanel() {
       <Section
         title="标签"
         count={tags.length}
-        defaultOpen={tags.length > 0}
+        defaultOpen={false}
         action={
           <button className="icon-btn" title="新建标签" onClick={() => void newTag()}>
             +
@@ -246,7 +238,7 @@ export function RefsPanel() {
       <Section
         title="Stash"
         count={stashes.length}
-        defaultOpen={stashes.length > 0}
+        defaultOpen={false}
         action={
           <button className="icon-btn" title="保存 stash" onClick={() => void newStash()}>
             +

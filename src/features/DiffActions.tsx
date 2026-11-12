@@ -51,7 +51,11 @@ export function DiffActions({ side }: { side: Side }) {
           >
             全选
           </button>
-          <button className="btn small" disabled={disabled || selCount === 0} onClick={clearSelection}>
+          <button
+            className="btn small"
+            disabled={disabled || selCount === 0}
+            onClick={clearSelection}
+          >
             清空
           </button>
         </>

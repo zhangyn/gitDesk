@@ -30,7 +30,12 @@ const root = mkdtempSync(join(tmpdir(), 'gitdesk-remote-'));
 const BASE = ['-c', 'core.quotepath=false', '-c', 'color.ui=false'];
 
 function git(cwd: string, args: string[], input?: string): string {
-  return execFileSync('git', [...BASE, ...args], { cwd, encoding: 'utf8', input, maxBuffer: 1 << 26 });
+  return execFileSync('git', [...BASE, ...args], {
+    cwd,
+    encoding: 'utf8',
+    input,
+    maxBuffer: 1 << 26,
+  });
 }
 
 function tryGit(cwd: string, args: string[]) {
@@ -65,7 +70,10 @@ try {
   // 1. bare 仓库当远端
   mkdirSync(originDir, { recursive: true });
   git(originDir, ['init', '-q', '--bare', '-b', 'main']);
-  check('bare 仓库已创建', tryGit(originDir, ['rev-parse', '--is-bare-repository']).out.trim() === 'true');
+  check(
+    'bare 仓库已创建',
+    tryGit(originDir, ['rev-parse', '--is-bare-repository']).out.trim() === 'true',
+  );
 
   // 2. A 仓库 → 首次推送（--set-upstream）
   initRepo(aDir);
@@ -138,7 +146,10 @@ try {
 
   const pullFail = tryGit(aDir, ['pull', '--ff-only']);
   check('分叉时 pull --ff-only 被拒绝', pullFail.code !== 0, pullFail.out);
-  check('拒绝后没有产生 merge commit', tryGit(aDir, ['rev-parse', '--verify', 'MERGE_HEAD']).code !== 0);
+  check(
+    '拒绝后没有产生 merge commit',
+    tryGit(aDir, ['rev-parse', '--verify', 'MERGE_HEAD']).code !== 0,
+  );
 
   // 8. 普通 push 在分叉时被拒绝
   const pushReject = tryGit(aDir, ['push', 'origin', 'refs/heads/main']);

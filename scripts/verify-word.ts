@@ -47,10 +47,11 @@ try {
     const { a, b } = diffWords('    foo();', '  foo();');
     eq('纯缩进：左侧不标记变化', changedText(a), []);
     eq('纯缩进：右侧不标记变化', changedText(b), []);
-    eq('纯缩进：文本未丢', [a.map((s) => s.text).join(''), b.map((s) => s.text).join('')], [
-      '    foo();',
-      '  foo();',
-    ]);
+    eq(
+      '纯缩进：文本未丢',
+      [a.map((s) => s.text).join(''), b.map((s) => s.text).join('')],
+      ['    foo();', '  foo();'],
+    );
   }
 
   // 4) 参数变多

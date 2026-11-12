@@ -38,10 +38,7 @@ export async function fetchRemote(repoPath: string, remote: string, prune = true
   return runGit(args, { cwd: repoPath, timeoutMs: 600_000 });
 }
 
-export async function pullRemote(
-  repoPath: string,
-  strategy: 'ff-only' | 'rebase' | 'merge',
-) {
+export async function pullRemote(repoPath: string, strategy: 'ff-only' | 'rebase' | 'merge') {
   const args = ['pull'];
   if (strategy === 'ff-only') args.push('--ff-only');
   if (strategy === 'rebase') args.push('--rebase');

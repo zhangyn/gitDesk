@@ -67,11 +67,7 @@ export function MenuItem({
   hint?: string;
 }) {
   return (
-    <button
-      className={`menu-item${danger ? ' danger' : ''}`}
-      disabled={disabled}
-      onClick={onClick}
-    >
+    <button className={`menu-item${danger ? ' danger' : ''}`} disabled={disabled} onClick={onClick}>
       <span className="menu-label">{children}</span>
       {hint && <span className="menu-hint">{hint}</span>}
     </button>

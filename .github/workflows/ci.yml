@@ -28,6 +28,12 @@ jobs:
       - name: 类型检查
         run: npm run typecheck
 
+      - name: 代码规范（ESLint）
+        run: npm run lint
+
+      - name: 格式检查（Prettier）
+        run: npm run format:check
+
       # 207 项断言：用真实 git 造合并/冲突/中文路径/CRLF 等场景
       - name: 端到端验证
         run: npm run verify

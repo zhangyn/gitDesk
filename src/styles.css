@@ -17,7 +17,7 @@
   /* 交互/辅助色（为浅色主题准备的语义变量） */
   --hover-1: rgba(255, 255, 255, 0.04);
   --hover-2: rgba(255, 255, 255, 0.08);
-  --sel: rgba(88, 166, 255, 0.20);
+  --sel: rgba(88, 166, 255, 0.2);
   --sel-strong: rgba(88, 166, 255, 0.3);
   --border-strong: #33415a;
   --btn-hover: #232b3a;
@@ -243,7 +243,10 @@ body.is-resizing {
   border: 1px solid transparent;
   color: var(--fg-dim);
   white-space: nowrap;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s,
+    border-color 0.1s;
 }
 
 .tb-btn:hover:not(:disabled) {
@@ -1620,7 +1623,8 @@ body.is-resizing {
   width: 18px;
   height: 18px;
   border-radius: 5px;
-  background: radial-gradient(circle at 50% 28%, var(--accent-2) 3px, transparent 4px),
+  background:
+    radial-gradient(circle at 50% 28%, var(--accent-2) 3px, transparent 4px),
     radial-gradient(circle at 30% 74%, var(--accent-2) 3px, transparent 4px),
     radial-gradient(circle at 70% 74%, var(--accent-2) 3px, transparent 4px),
     linear-gradient(180deg, #232835, #141822);
@@ -1630,7 +1634,8 @@ body.is-resizing {
   width: 46px;
   height: 46px;
   border-radius: 11px;
-  background: radial-gradient(circle at 50% 28%, var(--accent-2) 6px, transparent 7px),
+  background:
+    radial-gradient(circle at 50% 28%, var(--accent-2) 6px, transparent 7px),
     radial-gradient(circle at 30% 74%, var(--accent-2) 6px, transparent 7px),
     radial-gradient(circle at 70% 74%, var(--accent-2) 6px, transparent 7px),
     linear-gradient(180deg, #232835, #141822);
@@ -1907,7 +1912,10 @@ body.is-resizing {
   border-radius: 6px;
   background: var(--bg-raised);
   color: var(--fg-dim);
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
 }
 
 .btn:hover:not(:disabled) {
@@ -2186,7 +2194,6 @@ body.is-resizing {
   flex: 0 0 auto;
   max-width: 58%;
 }
-
 
 .repo-close {
   margin: 4px 11px 0;
@@ -2706,14 +2713,16 @@ body.is-resizing-x {
 }
 
 :root[data-theme='light'] .logo {
-  background: radial-gradient(circle at 50% 28%, #1a7f37 3px, transparent 4px),
+  background:
+    radial-gradient(circle at 50% 28%, #1a7f37 3px, transparent 4px),
     radial-gradient(circle at 30% 74%, #1a7f37 3px, transparent 4px),
     radial-gradient(circle at 70% 74%, #1a7f37 3px, transparent 4px),
     linear-gradient(180deg, #e9edf2, #dfe4ea);
 }
 
 :root[data-theme='light'] .logo.big {
-  background: radial-gradient(circle at 50% 28%, #1a7f37 6px, transparent 7px),
+  background:
+    radial-gradient(circle at 50% 28%, #1a7f37 6px, transparent 7px),
     radial-gradient(circle at 30% 74%, #1a7f37 6px, transparent 7px),
     radial-gradient(circle at 70% 74%, #1a7f37 6px, transparent 7px),
     linear-gradient(180deg, #e9edf2, #dfe4ea);
@@ -2988,7 +2997,9 @@ body.is-resizing-x {
   font-family: var(--sans);
   /* 常驻但淡显：藏到 hover 后面等于没有（用户根本发现不了这个能力） */
   opacity: 0.55;
-  transition: opacity 0.1s, background 0.1s;
+  transition:
+    opacity 0.1s,
+    background 0.1s;
 }
 
 .hunk:hover .hunk-act,
@@ -3048,4 +3059,11 @@ body.is-resizing-x {
   margin-top: 4px;
   color: var(--accent);
   font-size: 11px;
+}
+
+/* 列表获得焦点时的可见提示（只在键盘操作时出现） */
+.files-list:focus-visible,
+.commit-scroll:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }

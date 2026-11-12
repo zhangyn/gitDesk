@@ -44,10 +44,11 @@ export async function dropStash(repoPath: string, ref: string) {
 
 /** stash 里改了哪些文件（对比 stash 的父提交 = 当时的工作基线） */
 export async function stashFiles(repoPath: string, ref: string): Promise<CommitFile[]> {
-  const res = await runGit(
-    ['diff', '--name-status', '-z', '--no-renames', `${ref}^1`, ref],
-    { cwd: repoPath, quiet: true, timeoutMs: 30_000 },
-  );
+  const res = await runGit(['diff', '--name-status', '-z', '--no-renames', `${ref}^1`, ref], {
+    cwd: repoPath,
+    quiet: true,
+    timeoutMs: 30_000,
+  });
   if (res.code !== 0) return [];
   const tokens = res.stdout.split('\0').filter((t) => t.length > 0);
   const files: CommitFile[] = [];

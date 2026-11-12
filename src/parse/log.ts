@@ -23,7 +23,12 @@ export function parseLog(out: string): Commit[] {
       committerEmail: f[6],
       committerDate: Number(f[7]) || 0,
       subject: f[8],
-      refs: refsRaw ? refsRaw.split(',').map((s) => s.trim()).filter(Boolean) : [],
+      refs: refsRaw
+        ? refsRaw
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [],
     });
   }
   return commits;

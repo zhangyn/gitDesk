@@ -27,7 +27,11 @@ export function ProjectList() {
           </div>
         </div>
 
-        <button className="btn primary big-btn" onClick={() => void pickRepo()} disabled={busy !== null}>
+        <button
+          className="btn primary big-btn"
+          onClick={() => void pickRepo()}
+          disabled={busy !== null}
+        >
           + 打开仓库
         </button>
 
@@ -44,7 +48,11 @@ export function ProjectList() {
           )}
           {recent.map((r) => (
             <div key={r.path} className="repo-card">
-              <button className="repo-card-main" onClick={() => void openPath(r.path)} title={r.path}>
+              <button
+                className="repo-card-main"
+                onClick={() => void openPath(r.path)}
+                title={r.path}
+              >
                 <span className="repo-card-name">{r.name}</span>
                 <span className="repo-card-path mono">{r.path}</span>
               </button>

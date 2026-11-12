@@ -34,6 +34,7 @@ export function CommitList() {
   const clearLogQuery = useStore((s) => s.clearLogQuery);
   const logLimit = useStore((s) => s.logLimit);
   const loadMoreLog = useStore((s) => s.loadMoreLog);
+  const openDiffModal = useStore((s) => s.openDiffModal);
   const busy = useStore((s) => s.busy);
 
   const [searchMode, setSearchMode] = useState<'message' | 'path'>('message');
@@ -105,6 +106,63 @@ export function CommitList() {
   );
   const rowsHeight = Math.max(ROW_HEIGHT, graph.length * ROW_HEIGHT);
   const innerHeight = rowsHeight + (hasMore ? MORE_BAR_HEIGHT : 0);
+
+  /** 上下移动选中项（键盘用），顺手把它滚进可视区 */
+  const moveSelection = useCallback(
+    (delta: number) => {
+      if (graph.length === 0) return;
+      const cur = selectedIndex < 0 ? 0 : selectedIndex;
+      const next = Math.max(0, Math.min(graph.length - 1, cur + delta));
+      const sha = graph[next]?.sha;
+      if (!sha) return;
+      if (next !== selectedIndex) void openCommit(sha);
+      requestAnimationFrame(() => {
+        const rows = scrollRef.current?.querySelectorAll('.commit-row');
+        rows?.[next]?.scrollIntoView({ block: 'nearest' });
+      });
+    },
+    [graph, selectedIndex, openCommit],
+  );
+
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      switch (e.key) {
+        case 'ArrowDown':
+        case 'j':
+          e.preventDefault();
+          moveSelection(1);
+          break;
+        case 'ArrowUp':
+        case 'k':
+          e.preventDefault();
+          moveSelection(-1);
+          break;
+        case 'PageDown':
+          e.preventDefault();
+          moveSelection(20);
+          break;
+        case 'PageUp':
+          e.preventDefault();
+          moveSelection(-20);
+          break;
+        case 'Home':
+          e.preventDefault();
+          moveSelection(-graph.length);
+          break;
+        case 'End':
+          e.preventDefault();
+          moveSelection(graph.length);
+          break;
+        case 'Enter':
+          e.preventDefault();
+          openDiffModal();
+          break;
+        default:
+          break;
+      }
+    },
+    [moveSelection, graph.length, openDiffModal],
+  );
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -194,7 +252,14 @@ export function CommitList() {
       {head}
       <div className="commit-wrap">
         <canvas ref={canvasRef} className="commit-canvas" />
-        <div className="commit-scroll" ref={attachScroll} onScroll={onScroll}>
+        <div
+          className="commit-scroll"
+          ref={attachScroll}
+          onScroll={onScroll}
+          tabIndex={0}
+          onKeyDown={onKeyDown}
+          onMouseDown={() => scrollRef.current?.focus({ preventScroll: true })}
+        >
           <div className="commit-inner" style={{ height: innerHeight }}>
             {graph.map((row, i) => {
               const c = bySha.get(row.sha);

@@ -70,11 +70,13 @@ function BlockCard({ block, decision }: { block: ConflictBlock; decision: Decisi
         {block.hasBase && <span className="badge">含共同祖先</span>}
         <span className="spacer" />
         <span className={`cblock-state ${decision ? 'ok' : 'todo'}`}>
-          {decision ? `已选：${
-            { ours: '我方', theirs: '对方', both: '两者', 'both-reverse': '两者（对方在前）' }[
-              decision
-            ]
-          }` : '未处理'}
+          {decision
+            ? `已选：${
+                { ours: '我方', theirs: '对方', both: '两者', 'both-reverse': '两者（对方在前）' }[
+                  decision
+                ]
+              }`
+            : '未处理'}
         </span>
       </div>
       <div className="cblock-cols">
@@ -96,10 +98,7 @@ export function ConflictEditor() {
   const checkoutSideOp = useStore((s) => s.checkoutSideOp);
   const abortMergeOp = useStore((s) => s.abortMergeOp);
 
-  const parsed = useMemo(
-    () => (sides ? parseConflictFile(sides.merged) : null),
-    [sides],
-  );
+  const parsed = useMemo(() => (sides ? parseConflictFile(sides.merged) : null), [sides]);
 
   if (!sides || !parsed || !target) return null;
 
@@ -154,7 +153,11 @@ export function ConflictEditor() {
         >
           整文件采用对方
         </button>
-        <button className="btn small danger" disabled={disabled} onClick={() => void abortMergeOp()}>
+        <button
+          className="btn small danger"
+          disabled={disabled}
+          onClick={() => void abortMergeOp()}
+        >
           中止合并
         </button>
       </div>

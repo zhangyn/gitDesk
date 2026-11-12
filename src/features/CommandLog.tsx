@@ -22,9 +22,7 @@ export function CommandLog() {
     <div className="bottom-panel log-panel">
       <div className="bp-head">
         <span className="bp-title">命令日志</span>
-        <span className="bp-sub">
-          每条等价的 git 命令、退出码和耗时 —— 可以直接复制到终端重跑
-        </span>
+        <span className="bp-sub">每条等价的 git 命令、退出码和耗时 —— 可以直接复制到终端重跑</span>
         <span className="spacer" />
         <button className="btn small" onClick={clear} disabled={entries.length === 0}>
           清空

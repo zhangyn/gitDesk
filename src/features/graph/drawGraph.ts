@@ -48,11 +48,6 @@ export function graphWidthFor(rows: GraphRow[]): number {
   return Math.min(MAX_GRAPH_WIDTH, PAD_X * 2 + n * Math.max(MIN_LANE_STEP, step));
 }
 
-/** 给 UI 用的诊断值：泳道太多时提示"已压缩" */
-export function laneStats(rows: GraphRow[]): { lanes: number; step: number } {
-  return { lanes: laneCount(rows), step: laneStepFor(rows) };
-}
-
 function laneSpan(rows: GraphRow[]): number {
   return laneCount(rows);
 }
@@ -110,10 +105,7 @@ export function drawGraph(
 
   // 上下各多画一行，滚动时边缘不闪
   const firstRow = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 1);
-  const lastRow = Math.min(
-    rows.length,
-    Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + 1,
-  );
+  const lastRow = Math.min(rows.length, Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + 1);
 
   for (let i = firstRow; i < lastRow; i++) {
     const r = rows[i];

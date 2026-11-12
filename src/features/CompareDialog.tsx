@@ -105,12 +105,16 @@ export function CompareDialog({ open, onClose }: { open: boolean; onClose: () =>
               当前分支 ↔ 上游
             </button>
           )}
-          {head && <button className="btn small" onClick={() => setA('HEAD~10')}>
-            左侧填 HEAD~10
-          </button>}
-          {head && <button className="btn small" onClick={() => setA(head)}>
-            左侧填当前分支
-          </button>}
+          {head && (
+            <button className="btn small" onClick={() => setA('HEAD~10')}>
+              左侧填 HEAD~10
+            </button>
+          )}
+          {head && (
+            <button className="btn small" onClick={() => setA(head)}>
+              左侧填当前分支
+            </button>
+          )}
         </div>
 
         <div className="modal-actions">

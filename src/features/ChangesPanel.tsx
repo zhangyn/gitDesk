@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { hasStaged, hasWorktree, useStore } from '../store';
 import type { CommitFile, StatusEntry } from '../types';
 
@@ -87,14 +87,8 @@ function ChangeRow({ entry, order }: { entry: StatusEntry; order: string[] }) {
         }}
       >
         <span className="chg-chips" title="左：暂存区状态　右：工作区状态">
-          <Chip
-            letter={untracked ? '.' : entry.index}
-            tone={toneOf(entry.index, entry)}
-          />
-          <Chip
-            letter={untracked ? '?' : entry.worktree}
-            tone={toneOf(entry.worktree, entry)}
-          />
+          <Chip letter={untracked ? '.' : entry.index} tone={toneOf(entry.index, entry)} />
+          <Chip letter={untracked ? '?' : entry.worktree} tone={toneOf(entry.worktree, entry)} />
         </span>
         <span className="chg-path">
           {dir && <span className="chg-dir">{dir}</span>}
@@ -107,7 +101,11 @@ function ChangeRow({ entry, order }: { entry: StatusEntry; order: string[] }) {
           {worktree && (
             <button
               className="icon-btn"
-              title={untracked ? '暂存整个文件（git add）' : '暂存整个文件 —— 只暂存部分改动请在右侧选行或点差异块上的按钮'}
+              title={
+                untracked
+                  ? '暂存整个文件（git add）'
+                  : '暂存整个文件 —— 只暂存部分改动请在右侧选行或点差异块上的按钮'
+              }
               disabled={disabled}
               onClick={() => void stageEntry(entry)}
             >
@@ -183,6 +181,14 @@ export function ChangesPanel() {
   const stageAllOp = useStore((s) => s.stageAllOp);
   const unstageAllOp = useStore((s) => s.unstageAllOp);
   const pickedCount = useStore((s) => s.pickedPaths.length);
+  const pickedPaths = useStore((s) => s.pickedPaths);
+  const pickFile = useStore((s) => s.pickFile);
+  const showChange = useStore((s) => s.showChange);
+  const openDiffModal = useStore((s) => s.openDiffModal);
+  const stagePicked = useStore((s) => s.stagePicked);
+  const unstagePicked = useStore((s) => s.unstagePicked);
+  const target = useStore((s) => s.target);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
   const [filter, setFilter] = useState('');
 
@@ -196,13 +202,82 @@ export function ChangesPanel() {
   const total = status?.entries.length ?? 0;
   const activeTab = commitTabs.find((t) => t.key === fileTab) ?? null;
   const isWorktree = fileTab === 'worktree';
-  const hasStagedAny = (status?.entries ?? []).some((e) => e.kind !== 'untracked' && e.index !== '.');
+  const hasStagedAny = (status?.entries ?? []).some(
+    (e) => e.kind !== 'untracked' && e.index !== '.',
+  );
 
   const commitFileList = useMemo(() => {
     if (!filter.trim()) return commitFiles;
     const q = filter.trim().toLowerCase();
     return commitFiles.filter((f) => f.path.toLowerCase().includes(q));
   }, [commitFiles, filter]);
+
+  const order = useMemo(() => entries.map((e) => e.path), [entries]);
+
+  /** 键盘：↑↓ / j k 移动，Space 多选，Enter 放大，+/- 暂存或取消暂存选中项 */
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!isWorktree) return;
+      const curPath = target?.kind === 'file' ? target.path : (pickedPaths[0] ?? null);
+      const cur = curPath ? order.indexOf(curPath) : -1;
+      const go = (delta: number) => {
+        if (order.length === 0) return;
+        const base = cur < 0 ? (delta > 0 ? -1 : 0) : cur;
+        const next = Math.max(0, Math.min(order.length - 1, base + delta));
+        const entry = entries[next];
+        if (!entry) return;
+        pickFile(entry.path, 'single', order);
+        void showChange(entry);
+        requestAnimationFrame(() => {
+          listRef.current?.querySelectorAll('.chg-row')[next]?.scrollIntoView({ block: 'nearest' });
+        });
+      };
+
+      switch (e.key) {
+        case 'ArrowDown':
+        case 'j':
+          e.preventDefault();
+          go(1);
+          break;
+        case 'ArrowUp':
+        case 'k':
+          e.preventDefault();
+          go(-1);
+          break;
+        case ' ':
+          e.preventDefault();
+          if (curPath) pickFile(curPath, 'toggle', order);
+          break;
+        case 'Enter':
+          e.preventDefault();
+          openDiffModal();
+          break;
+        case '+':
+        case '=':
+          e.preventDefault();
+          void stagePicked();
+          break;
+        case '-':
+          e.preventDefault();
+          void unstagePicked();
+          break;
+        default:
+          break;
+      }
+    },
+    [
+      isWorktree,
+      target,
+      pickedPaths,
+      order,
+      entries,
+      pickFile,
+      showChange,
+      openDiffModal,
+      stagePicked,
+      unstagePicked,
+    ],
+  );
 
   return (
     <div className="files-panel">
@@ -221,9 +296,7 @@ export function ChangesPanel() {
               key={t.key}
               className={`file-tab commit-tab${t.kind === 'stash' ? ' stash-tab' : ''}${
                 t.kind === 'compare' ? ' compare-tab' : ''
-              }${
-                fileTab === t.key ? ' is-on' : ''
-              }`}
+              }${fileTab === t.key ? ' is-on' : ''}`}
             >
               <button
                 className="file-tab-label"
@@ -248,7 +321,10 @@ export function ChangesPanel() {
         {isWorktree ? (
           <>
             {pickedCount > 0 && (
-              <span className="picked-count" title="已勾选的文件数（工具栏的暂存/取消暂存只作用于勾选项）">
+              <span
+                className="picked-count"
+                title="已勾选的文件数（工具栏的暂存/取消暂存只作用于勾选项）"
+              >
                 已选 {pickedCount} 个
               </span>
             )}
@@ -273,9 +349,7 @@ export function ChangesPanel() {
             </button>
           </>
         ) : (
-          <span className="hint">
-            {activeTab ? `${commitFiles.length} 个文件` : ''}
-          </span>
+          <span className="hint">{activeTab ? `${commitFiles.length} 个文件` : ''}</span>
         )}
       </div>
 
@@ -290,7 +364,13 @@ export function ChangesPanel() {
         </div>
       )}
 
-      <div className="files-list">
+      <div
+        className="files-list"
+        ref={listRef}
+        tabIndex={isWorktree ? 0 : -1}
+        onKeyDown={onKeyDown}
+        onMouseDown={() => listRef.current?.focus({ preventScroll: true })}
+      >
         {isWorktree ? (
           <>
             {entries.length === 0 && total === 0 && (
@@ -300,11 +380,7 @@ export function ChangesPanel() {
               <div className="empty-hint small">没有匹配的文件</div>
             )}
             {entries.map((e) => (
-              <ChangeRow
-                key={`${e.path}-${e.kind}`}
-                entry={e}
-                order={entries.map((x) => x.path)}
-              />
+              <ChangeRow key={`${e.path}-${e.kind}`} entry={e} order={entries.map((x) => x.path)} />
             ))}
           </>
         ) : (
