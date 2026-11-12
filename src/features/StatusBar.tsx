@@ -1,6 +1,5 @@
 import { useStore } from '../store';
 import { useLog } from '../stores/log';
-import { IconLog } from '../ui/icons';
 
 /** 底部状态条（对标 SmartGit 的 Ready / 1 File / 1:1 那一行） */
 export function StatusBar() {
@@ -8,8 +7,6 @@ export function StatusBar() {
   const status = useStore((s) => s.status);
   const git = useStore((s) => s.git);
   const busy = useStore((s) => s.busy);
-  const bottomPanel = useStore((s) => s.bottomPanel);
-  const setBottomPanel = useStore((s) => s.setBottomPanel);
   const logEntries = useLog((s) => s.entries);
   const last = logEntries[logEntries.length - 1];
 
@@ -49,13 +46,6 @@ export function StatusBar() {
           {git.version.replace(/^git version\s*/i, 'git ')}
         </span>
       )}
-      <button
-        className={`sb-btn${bottomPanel === 'log' ? ' is-on' : ''}`}
-        onClick={() => setBottomPanel('log')}
-        title="命令日志"
-      >
-        <IconLog size={12} /> 日志
-      </button>
     </footer>
   );
 }

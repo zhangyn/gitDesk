@@ -159,6 +159,33 @@ export function IconUnified({ size, className }: P) {
   );
 }
 
+export function IconSun({ size, className }: P) {
+  return (
+    <svg {...base(size)} className={className}>
+      <circle cx="8" cy="8" r="3.1" />
+      <path d="M8 1.6v1.5M8 12.9v1.5M1.6 8h1.5M12.9 8h1.5" />
+      <path d="M3.5 3.5l1.1 1.1M11.4 11.4l1.1 1.1M12.5 3.5l-1.1 1.1M4.6 11.4l-1.1 1.1" />
+    </svg>
+  );
+}
+
+export function IconMoon({ size, className }: P) {
+  return (
+    <svg {...base(size)} className={className}>
+      <path d="M13.2 9.6A5.6 5.6 0 0 1 6.4 2.8 5.8 5.8 0 1 0 13.2 9.6z" />
+    </svg>
+  );
+}
+
+export function IconAuto({ size, className }: P) {
+  return (
+    <svg {...base(size)} className={className}>
+      <circle cx="8" cy="8" r="5.4" />
+      <path d="M8 2.6a5.4 5.4 0 0 0 0 10.8z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function IconCompare({ size, className }: P) {
   return (
     <svg {...base(size)} className={className}>

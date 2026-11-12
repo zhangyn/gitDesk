@@ -6,8 +6,11 @@ import type { RefEntry } from '../types';
 import { THEME_LABEL, nextTheme } from '../ui/theme';
 import { CompareDialog } from './CompareDialog';
 import {
+  IconAuto,
   IconBranch,
   IconCompare,
+  IconMoon,
+  IconSun,
   IconChevron,
   IconCommit,
   IconFolder,
@@ -334,7 +337,7 @@ export function Toolbar() {
       {branch && (
         <span className="branch-pill" title={`当前分支 ${branch}`}>
           <IconBranch size={12} />
-          {branch}
+          <span className="branch-pill-name">{branch}</span>
           {ahead > 0 && <span className="ab-ahead">&gt;{ahead}</span>}
           {behind > 0 && <span className="ab-behind">&lt;{behind}</span>}
         </span>
@@ -374,11 +377,17 @@ export function Toolbar() {
         title="F5"
       />
       <button
-        className="tb-btn icon-btn2"
+        className="tb-btn"
         onClick={() => setTheme(nextTheme(theme))}
         title={`主题：${THEME_LABEL[theme]}（点击切换，Ctrl+Shift+L）`}
       >
-        {theme === 'light' ? '☀' : theme === 'dark' ? '🌙' : '◐'}
+        {theme === 'light' ? (
+          <IconSun size={14} />
+        ) : theme === 'dark' ? (
+          <IconMoon size={14} />
+        ) : (
+          <IconAuto size={14} />
+        )}
       </button>
 
       <CompareDialog open={compareOpen} onClose={() => setCompareOpen(false)} />
