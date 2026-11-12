@@ -11,6 +11,25 @@ interface ReadResult {
   size: number;
 }
 
+/* ------------------------------------------------ diff 展示选项（全局生效） */
+
+let ignoreWhitespace = false;
+let ignoreEol = false;
+
+/** store 的 setDiffFlag 会同步到这里；之后所有 diff 命令自动带上对应参数 */
+export function setDiffFlags(flags: { ignoreWhitespace?: boolean; ignoreEol?: boolean }): void {
+  if (flags.ignoreWhitespace !== undefined) ignoreWhitespace = flags.ignoreWhitespace;
+  if (flags.ignoreEol !== undefined) ignoreEol = flags.ignoreEol;
+}
+
+/** 当前选项对应的 git diff 参数；stash.ts 也用它，保证所有 diff 视图行为一致 */
+export function diffViewArgs(): string[] {
+  const args: string[] = [];
+  if (ignoreWhitespace) args.push('--ignore-all-space');
+  if (ignoreEol) args.push('--ignore-cr-at-eol');
+  return args;
+}
+
 /** 提交内单个文件的 diff（对根提交也成立） */
 export async function getCommitDiff(
   repoPath: string,
@@ -30,7 +49,7 @@ export async function getWorktreeDiff(
   path: string,
   staged: boolean,
 ): Promise<FilePatch[]> {
-  const args = ['diff', '--no-color', '--no-ext-diff', '-U3', '--no-renames'];
+  const args = ['diff', '--no-color', '--no-ext-diff', '-U3', '--no-renames', ...diffViewArgs()];
   if (staged) args.push('--cached');
   args.push('--', path);
   const res = await runGit(args, { cwd: repoPath, timeoutMs: 60_000 });

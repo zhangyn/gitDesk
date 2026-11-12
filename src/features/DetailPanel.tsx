@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
-import { hasStaged, hasWorktree, useStore } from '../store';
+import { useEffect, useMemo, useState } from 'react';
+import { hasStaged, hasWorktree, useStore, type DiffFlags } from '../store';
 import type { Side } from '../types';
 import { DiffView, type DiffMode } from './DiffView';
 import { DiffActions } from './DiffActions';
 import { ConflictEditor } from './ConflictEditor';
 import { IconSplit, IconUnified } from '../ui/icons';
 import { HunkNav, useHunkNav } from '../ui/HunkNav';
+import { copyText } from '../ui/clipboard';
 
 const MODE_KEY = 'gitdesk.diffMode';
 const DATE_FMT = new Intl.DateTimeFormat('zh-CN', {
@@ -67,6 +68,47 @@ function WordToggle() {
   );
 }
 
+/** diff 展示选项小开关：忽略空白 / 忽略 CRLF / 自动换行 */
+function FlagToggle({
+  flag,
+  label,
+  title,
+}: {
+  flag: keyof DiffFlags;
+  label: string;
+  title: string;
+}) {
+  const on = useStore((s) => s.diffFlags[flag]);
+  const set = useStore((s) => s.setDiffFlag);
+  return (
+    <button
+      className={`btn small word-toggle${on ? ' is-on' : ''}`}
+      title={`${title}（点击切换，改动会重新拉取当前 diff）`}
+      onClick={() => void set(flag, !on)}
+    >
+      {label}
+    </button>
+  );
+}
+
+function DiffFlagToggles() {
+  return (
+    <>
+      <FlagToggle
+        flag="ignoreWhitespace"
+        label="空白"
+        title="忽略空白差异（git diff --ignore-all-space）：缩进/空格变化不再显示"
+      />
+      <FlagToggle
+        flag="ignoreEol"
+        label="CRLF"
+        title="忽略换行符差异（--ignore-cr-at-eol）：CRLF/LF 转换不再显示"
+      />
+      <FlagToggle flag="wordWrap" label="换行" title="自动换行：超长行折行显示" />
+    </>
+  );
+}
+
 function ModeToggle({ mode, onChange }: { mode: DiffMode; onChange: (m: DiffMode) => void }) {
   return (
     <div className="mode-toggle">
@@ -103,6 +145,8 @@ export function DetailPanel() {
   const [mode, setMode] = useDiffMode();
   const cherryPickOp = useStore((s) => s.cherryPickOp);
   const revertOp = useStore((s) => s.revertOp);
+  const undoLastCommitOp = useStore((s) => s.undoLastCommitOp);
+  const wordWrap = useStore((s) => s.diffFlags.wordWrap);
 
   const hunkCount = useMemo(() => patches.reduce((n, p) => n + p.hunks.length, 0), [patches]);
   // 中间面板与双击弹窗共用同一套导航；换文件/换提交就回到第 1 块
@@ -110,6 +154,17 @@ export function DetailPanel() {
     hunkCount,
     `${target?.kind ?? ''}:${target?.path ?? ''}:${target?.sha ?? ''}:${target?.ref ?? ''}`,
   );
+
+  // F6 / Shift+F6：在差异块之间跳转（对齐 SmartGit 的 Next/Previous Change）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'F6') return;
+      e.preventDefault();
+      nav.go(e.shiftKey ? -1 : 1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [nav]);
 
   const commit = useMemo(
     () => commits.find((c) => c.sha === selectedSha) ?? null,
@@ -184,6 +239,20 @@ export function DetailPanel() {
             </span>
             <span className="spacer" />
             <button
+              className="icon-btn"
+              title="复制完整 SHA"
+              onClick={() => void copyText(commit.sha)}
+            >
+              ⧉
+            </button>
+            <button
+              className="icon-btn"
+              title="复制提交信息（标题 + 正文）"
+              onClick={() => void copyText(commitBody.trim() || commit.subject)}
+            >
+              📋
+            </button>
+            <button
               className="btn small"
               title={`把 ${commit.sha.slice(0, 7)} 拣选到当前分支（git cherry-pick）`}
               onClick={() => void cherryPickOp(commit.sha)}
@@ -197,8 +266,19 @@ export function DetailPanel() {
             >
               还原
             </button>
+            {/* 只对当前 HEAD 的提交提供撤销：reset --soft 会改写历史位置 */}
+            {commit.sha !== null && commit.sha === status?.branch.oid && (
+              <button
+                className="btn small danger"
+                title="撤销这次提交（git reset --soft HEAD~1）：改动回到暂存区"
+                onClick={() => void undoLastCommitOp(commit.sha)}
+              >
+                撤销提交
+              </button>
+            )}
             <HunkNav count={hunkCount} index={nav.index} onGo={nav.go} />
             <WordToggle />
+            <DiffFlagToggles />
             <ModeToggle mode={mode} onChange={setMode} />
           </div>
 
@@ -237,6 +317,7 @@ export function DetailPanel() {
           <span className="spacer" />
           {!isConflict && <HunkNav count={hunkCount} index={nav.index} onGo={nav.go} />}
           {!isConflict && <WordToggle />}
+          {!isConflict && <DiffFlagToggles />}
           {!isConflict && <ModeToggle mode={mode} onChange={setMode} />}
         </div>
       )}
@@ -253,6 +334,7 @@ export function DetailPanel() {
           interactive={!isCommitView && !isStashView && !isCompareView}
           side={side}
           mode={mode}
+          wrap={wordWrap}
           containerRef={nav.containerRef}
           emptyText={
             !isCommitView && !isStashView && !isCompareView && side === 'staged'

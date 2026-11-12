@@ -21,9 +21,14 @@ export async function deleteBranch(repoPath: string, name: string, force = false
   return runGit(['branch', force ? '-D' : '-d', '--', name], { cwd: repoPath });
 }
 
-/** 合并某个分支到当前分支（--no-ff 保留合并点，便于看出来龙去脉） */
-export async function mergeBranch(repoPath: string, name: string) {
-  return runGit(['merge', '--no-ff', '--no-edit', name], {
+/**
+ * 合并某个分支到当前分支。
+ * squash=true 时用 --squash：改动进暂存区、不产生合并提交（提交信息由用户自己写）。
+ */
+export async function mergeBranch(repoPath: string, name: string, squash = false) {
+  const args = squash ? ['merge', '--squash'] : ['merge', '--no-ff', '--no-edit'];
+  args.push(name);
+  return runGit(args, {
     cwd: repoPath,
     timeoutMs: 300_000,
   });

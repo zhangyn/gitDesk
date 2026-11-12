@@ -1,10 +1,17 @@
-import { useMemo, type RefObject } from 'react';
+import { useEffect, useMemo, useState, type RefObject } from 'react';
 import type { DiffLine, DiffHunk, FilePatch, Side } from '../types';
 import { useStore } from '../store';
 import { hunkKeys, isSelectable, lineKey } from '../patch/build';
 import { buildWordMap, type Segment } from '../patch/word';
 
 export type DiffMode = 'split' | 'unified';
+
+/**
+ * 单文件 diff 渲染行数上限：超限时按 hunk 截断，点一下展开全部。
+ * lockfile / minified 产物动辄上万行，全量渲染 DOM 会直接卡死。
+ * 与 SmartGit 的 changes.maximumFileSize 策略一致（显示截断 + 允许强制查看）。
+ */
+const DIFF_LINE_CAP = 4000;
 
 function sign(kind: string): string {
   if (kind === 'add') return '+';
@@ -123,11 +130,13 @@ function SplitView({
   pi,
   interactive,
   side,
+  maxHunks,
 }: {
   patch: FilePatch;
   pi: number;
   interactive: boolean;
   side: Side;
+  maxHunks?: number;
 }) {
   const selection = useStore((s) => s.selection);
   const toggleKeys = useStore((s) => s.toggleKeys);
@@ -176,9 +185,12 @@ function SplitView({
   // 分栏行只在 patch 变化时算一次；否则点一行选中会重跑所有 hunk 的转换
   const splitRows = useMemo(() => patch.hunks.map((h) => toSplitRows(h)), [patch]);
 
+  // slice(0, k) 保持原始索引，hunk 头和 gapBefore 都按原下标工作
+  const shown = patch.hunks.slice(0, maxHunks ?? patch.hunks.length);
+
   return (
     <>
-      {patch.hunks.map((hunk, hi) => {
+      {shown.map((hunk, hi) => {
         const rows = splitRows[hi] ?? [];
         // 分栏模式下 hunk 选择仍按「块」操作
         const keys = hunkKeys(pi, hi, hunk, side);
@@ -234,11 +246,13 @@ function UnifiedView({
   pi,
   interactive,
   side,
+  maxHunks,
 }: {
   patch: FilePatch;
   pi: number;
   interactive: boolean;
   side: Side;
+  maxHunks?: number;
 }) {
   const selection = useStore((s) => s.selection);
   const toggleKeys = useStore((s) => s.toggleKeys);
@@ -251,9 +265,11 @@ function UnifiedView({
     return m;
   }, [patch, wordMode]);
 
+  const shown = patch.hunks.slice(0, maxHunks ?? patch.hunks.length);
+
   return (
     <>
-      {patch.hunks.map((hunk, hi) => {
+      {shown.map((hunk, hi) => {
         const keys = hunkKeys(pi, hi, hunk, side);
         const selCount = keys.filter((k) => selection.has(k)).length;
         const allSel = keys.length > 0 && selCount === keys.length;
@@ -314,6 +330,92 @@ function UnifiedView({
   );
 }
 
+/** 单文件的 diff 块：行数超限时按 hunk 截断，点「展开全部」再看完整内容 */
+function FileDiff({
+  patch,
+  pi,
+  interactive,
+  side,
+  mode,
+  showHead,
+}: {
+  patch: FilePatch;
+  pi: number;
+  interactive: boolean;
+  side: Side;
+  mode: DiffMode;
+  /** 多文件时每个文件前显示路径头；单文件时路径已在面板标题里，不重复 */
+  showHead: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const totalLines = useMemo(() => patch.hunks.reduce((n, h) => n + h.lines.length, 0), [patch]);
+  // patch 换了就回到截断状态
+  useEffect(() => {
+    setExpanded(false);
+  }, [patch]);
+
+  let maxHunks: number | undefined;
+  let shownLines = totalLines;
+  if (!expanded && totalLines > DIFF_LINE_CAP) {
+    shownLines = 0;
+    maxHunks = 0;
+    for (let hi = 0; hi < patch.hunks.length; hi++) {
+      const n = patch.hunks[hi].lines.length;
+      // 至少显示一个 hunk，保证用户能看到开头
+      if (shownLines > 0 && shownLines + n > DIFF_LINE_CAP) break;
+      shownLines += n;
+      maxHunks = hi + 1;
+    }
+  }
+  const truncated = maxHunks !== undefined;
+
+  return (
+    <div className="diff-file">
+      {showHead && (
+        <div className="diff-file-head">
+          <span className="mono path">{patch.newPath}</span>
+          {patch.isNew && <span className="badge badge-add">新增</span>}
+          {patch.isDeleted && <span className="badge badge-del">删除</span>}
+          {patch.isBinary && <span className="badge">二进制</span>}
+          {patch.synthetic && <span className="badge">未跟踪</span>}
+        </div>
+      )}
+      {patch.isBinary && patch.hunks.length === 0 && (
+        <div className="diff-empty small">二进制文件不展示内容</div>
+      )}
+
+      {mode === 'split' ? (
+        <SplitView
+          patch={patch}
+          pi={pi}
+          interactive={interactive}
+          side={side}
+          maxHunks={maxHunks}
+        />
+      ) : (
+        <UnifiedView
+          patch={patch}
+          pi={pi}
+          interactive={interactive}
+          side={side}
+          maxHunks={maxHunks}
+        />
+      )}
+
+      {truncated && (
+        <div className="diff-truncated">
+          <span>
+            共 {totalLines} 行，已显示前 {shownLines} 行
+          </span>
+          <button className="btn small" onClick={() => setExpanded(true)}>
+            展开全部
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function DiffView({
   patches,
   loading,
@@ -323,6 +425,7 @@ export function DiffView({
   mode,
   emptyText,
   containerRef,
+  wrap = false,
 }: {
   patches: FilePatch[];
   loading: boolean;
@@ -332,6 +435,8 @@ export function DiffView({
   mode: DiffMode;
   emptyText?: string;
   containerRef?: RefObject<HTMLDivElement>;
+  /** 自动换行：超长行折行显示而不是省略号截断 */
+  wrap?: boolean;
 }) {
   if (loading) return <div className="diff-empty">加载中…</div>;
   if (!hasTarget) return <div className="diff-empty">选择左侧的提交或文件查看差异</div>;
@@ -339,30 +444,20 @@ export function DiffView({
     return <div className="diff-empty">{emptyText ?? '没有可显示的差异'}</div>;
 
   return (
-    <div className={`diff${mode === 'split' ? ' is-split' : ''}`} ref={containerRef}>
+    <div
+      className={`diff${mode === 'split' ? ' is-split' : ''}${wrap ? ' is-wrap' : ''}`}
+      ref={containerRef}
+    >
       {patches.map((p, pi) => (
-        <div className="diff-file" key={`${p.newPath}-${pi}`}>
-          {/* 只有一个文件时，路径已经在面板标题里了，不要再重复一遍 */}
-          {patches.length > 1 && (
-            <div className="diff-file-head">
-              <span className="mono path">{p.newPath}</span>
-              {p.isNew && <span className="badge badge-add">新增</span>}
-              {p.isDeleted && <span className="badge badge-del">删除</span>}
-              {p.isBinary && <span className="badge">二进制</span>}
-              {p.synthetic && <span className="badge">未跟踪</span>}
-            </div>
-          )}
-
-          {p.isBinary && p.hunks.length === 0 && (
-            <div className="diff-empty small">二进制文件不展示内容</div>
-          )}
-
-          {mode === 'split' ? (
-            <SplitView patch={p} pi={pi} interactive={interactive} side={side} />
-          ) : (
-            <UnifiedView patch={p} pi={pi} interactive={interactive} side={side} />
-          )}
-        </div>
+        <FileDiff
+          key={`${p.newPath}-${pi}`}
+          patch={p}
+          pi={pi}
+          interactive={interactive}
+          side={side}
+          mode={mode}
+          showHead={patches.length > 1}
+        />
       ))}
     </div>
   );

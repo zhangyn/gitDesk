@@ -2,8 +2,15 @@
 
 use std::io::Read;
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
 
 use serde::{Deserialize, Serialize};
+
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,8 +78,38 @@ pub fn write_text_file(req: WriteRequest) -> Result<u64, String> {
     Ok(req.content.len() as u64)
 }
 
-/* ------------------------------------------------------------ 启动参数 */
+/* ------------------------------------------------- 外部打开 */
 
+/// 在资源管理器中显示文件/目录。
+/// 文件用 `/select,` 定位并选中；目录直接打开。explorer 自己异步启动，不等待退出。
+#[tauri::command]
+pub fn reveal_in_explorer(path: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if !p.exists() {
+        return Err(format!("路径不存在：{}", path));
+    }
+    #[cfg(windows)]
+    {
+        let mut cmd = Command::new("explorer.exe");
+        if p.is_file() {
+            cmd.arg(format!("/select,{}", path));
+        } else {
+            cmd.arg(&path);
+        }
+        cmd.stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd.spawn().map_err(|e| format!("无法打开资源管理器：{}", e))?;
+        return Ok(());
+    }
+    #[cfg(not(windows))]
+    {
+        Err("仅支持 Windows".to_string())
+    }
+}
+
+/* ------------------------------------------------------------ 启动参数 */
 /// 支持 `gitdesk.exe D:\path\to\repo`（右键「用 GitDesk 打开」/ 命令行）。
 /// 只接受存在且带 .git 的目录，避免误判。
 #[tauri::command]

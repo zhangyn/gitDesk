@@ -16,6 +16,7 @@ pub fn run() {
             git_cmd::git_cancel,
             read_file::read_text_file,
             read_file::write_text_file,
+            read_file::reveal_in_explorer,
             read_file::startup_repo,
             watch::watch_repo,
             watch::unwatch_repo,

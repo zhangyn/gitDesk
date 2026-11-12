@@ -83,7 +83,3 @@ export async function checkoutSide(
 export async function abortMerge(repoPath: string) {
   return runGit(['merge', '--abort'], { cwd: repoPath, timeoutMs: 120_000 });
 }
-
-export async function rebaseContinue(repoPath: string) {
-  return runGit(['rebase', '--continue'], { cwd: repoPath, timeoutMs: 120_000 });
-}

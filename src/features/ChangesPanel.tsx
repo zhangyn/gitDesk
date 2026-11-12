@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { hasStaged, hasWorktree, useStore } from '../store';
+import { absPath } from '../git/ops/repo';
 import type { CommitFile, StatusEntry } from '../types';
 
 type Tone = 'add' | 'mod' | 'del' | 'rename' | 'conflict' | 'untracked' | 'none';
@@ -50,6 +52,7 @@ const FILE_TONE: Record<string, Tone> = {
 /** 工作区变更行。单击选中并预览，Ctrl 切换勾选，Shift 连选 */
 function ChangeRow({ entry, order }: { entry: StatusEntry; order: string[] }) {
   const target = useStore((s) => s.target);
+  const repo = useStore((s) => s.repo);
   const picked = useStore((s) => s.pickedPaths.includes(entry.path));
   const pickFile = useStore((s) => s.pickFile);
   const showChange = useStore((s) => s.showChange);
@@ -66,6 +69,8 @@ function ChangeRow({ entry, order }: { entry: StatusEntry; order: string[] }) {
   const active = target?.kind === 'file' && target.path === entry.path;
   const { dir, base } = splitPath(entry.path);
   const disabled = busy !== null;
+  // 文件在磁盘上可能不存在（工作区删除）：这时资源管理器打不开，不显示按钮
+  const revealable = repo !== null && entry.worktree !== 'D';
 
   return (
     <div
@@ -98,6 +103,21 @@ function ChangeRow({ entry, order }: { entry: StatusEntry; order: string[] }) {
 
       {!unmerged && (
         <span className="row-actions">
+          {revealable && (
+            <button
+              className="icon-btn"
+              title="在资源管理器中显示"
+              disabled={disabled}
+              onClick={() => {
+                if (!repo) return;
+                void invoke('reveal_in_explorer', {
+                  path: absPath(repo.path, entry.path),
+                }).catch(() => {});
+              }}
+            >
+              📂
+            </button>
+          )}
           {worktree && (
             <button
               className="icon-btn"
@@ -380,7 +400,7 @@ export function ChangesPanel() {
               <div className="empty-hint small">没有匹配的文件</div>
             )}
             {entries.map((e) => (
-              <ChangeRow key={`${e.path}-${e.kind}`} entry={e} order={entries.map((x) => x.path)} />
+              <ChangeRow key={`${e.path}-${e.kind}`} entry={e} order={order} />
             ))}
           </>
         ) : (

@@ -78,11 +78,25 @@ export function RefsPanel() {
   const stashDropOp = useStore((s) => s.stashDropOp);
   const stashSaveOp = useStore((s) => s.stashSaveOp);
   const restoreBackupOp = useStore((s) => s.restoreBackupOp);
+  const deleteRemoteBranchOp = useStore((s) => s.deleteRemoteBranchOp);
 
-  const branches = refs.filter((r) => r.kind === 'branch');
-  const remotes = refs.filter((r) => r.kind === 'remote');
-  const tags = refs.filter((r) => r.kind === 'tag');
+  // 分支/远程/标签多时一个过滤框比逐组翻找快得多（SmartGit 的 speed search 思路）
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+  const match = (name: string): boolean => !q || name.toLowerCase().includes(q);
+
+  const branches = refs.filter((r) => r.kind === 'branch' && match(r.name));
+  const remotes = refs.filter((r) => r.kind === 'remote' && match(r.name));
+  const tags = refs.filter((r) => r.kind === 'tag' && match(r.name));
+  const shownStashes = stashes.filter((s) => match(s.ref) || match(s.subject));
   const head = status?.branch.head ?? null;
+
+  /** origin/feature-x → 删远端要拆成 remote=origin + branch=feature-x */
+  const deleteRemoteRef = (name: string) => {
+    const i = name.indexOf('/');
+    if (i <= 0) return;
+    void deleteRemoteBranchOp(name.slice(0, i), name.slice(i + 1));
+  };
 
   const newBranch = async () => {
     const name = await promptBox({
@@ -121,6 +135,16 @@ export function RefsPanel() {
 
   return (
     <div className="refs-inner">
+      {refs.length + stashes.length + backups.length > 6 && (
+        <div className="changes-filter refs-filter">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="过滤分支 / 标签 / stash…"
+            spellCheck={false}
+          />
+        </div>
+      )}
       <Section
         title="本地分支"
         count={branches.length}
@@ -202,6 +226,13 @@ export function RefsPanel() {
               >
                 ⤓
               </button>
+              <button
+                className="icon-btn danger"
+                title={`删除远端分支 ${r.name}`}
+                onClick={() => deleteRemoteRef(r.name)}
+              >
+                ✕
+              </button>
             </span>
           </div>
         ))}
@@ -237,7 +268,7 @@ export function RefsPanel() {
 
       <Section
         title="Stash"
-        count={stashes.length}
+        count={shownStashes.length}
         defaultOpen={false}
         action={
           <button className="icon-btn" title="保存 stash" onClick={() => void newStash()}>
@@ -245,8 +276,8 @@ export function RefsPanel() {
           </button>
         }
       >
-        {stashes.length === 0 && <div className="empty-hint small">无</div>}
-        {stashes.map((s) => (
+        {shownStashes.length === 0 && <div className="empty-hint small">无</div>}
+        {shownStashes.map((s) => (
           <div
             key={s.ref}
             className="ref-row stash-row-item"

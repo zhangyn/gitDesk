@@ -3100,3 +3100,98 @@ body.is-resizing-x {
     display: none;
   }
 }
+
+/* ==================== v9：diff 选项 / 复制 / 截断 / 仓库分支名 ==================== */
+
+/* 自动换行：超长行折行而不是截断省略（detail 面板「换行」开关） */
+.diff.is-wrap .dl,
+.diff.is-wrap .dsp-cell {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.diff.is-wrap .dl .txt,
+.diff.is-wrap .dsp-cell .txt {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: visible;
+}
+
+/* 大文件截断提示条 */
+.diff-truncated {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  background: color-mix(in srgb, var(--border) 25%, transparent);
+  border-top: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--border);
+}
+
+/* 提交行 hover 时出现的「复制 SHA」按钮 */
+.commit-row .row-copy {
+  flex: 0 0 auto;
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.commit-row:hover .row-copy,
+.commit-row .row-copy:focus-visible {
+  opacity: 1;
+}
+
+.commit-row .row-copy:hover {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* 提交信息 72 列参考线（mono 字体下 ch 与字符等宽） */
+.commit-msg {
+  background-image: linear-gradient(to right, var(--border) 1px, transparent 1px);
+  background-repeat: no-repeat;
+  background-position: calc(9px + 72ch) 0;
+  background-size: 1px 100%;
+}
+
+/* 左栏 refs 过滤框（复用 changes-filter 的输入样式，只补外边距） */
+.refs-filter {
+  margin: 0 8px 6px;
+}
+
+/* 合并弹层里的 squash 开关 */
+.menu-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.menu-check:hover {
+  color: var(--fg);
+}
+
+/* 仓库列表的 name (branch) 显示 */
+.repo-item-branch {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: var(--muted);
+}

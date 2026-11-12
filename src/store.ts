@@ -14,7 +14,14 @@ import type {
   StatusEntry,
 } from './types';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { probeGit, runGit, setOneShotAuth, watcherSuppressed } from './git/runner';
+import {
+  beginWriteWindow,
+  endWriteWindow,
+  probeGit,
+  runGit,
+  setOneShotAuth,
+  watcherSuppressed,
+} from './git/runner';
 import { openRepo } from './git/ops/repo';
 import { getStatus } from './git/ops/status';
 import {
@@ -27,7 +34,7 @@ import {
 } from './git/ops/log';
 import { compareFileDiff, compareFiles, compareStat, resolveRev } from './git/ops/compare';
 import { getRefs } from './git/ops/refs';
-import { getCommitDiff, getUntrackedDiff, getWorktreeDiff } from './git/ops/diff';
+import { getCommitDiff, getUntrackedDiff, getWorktreeDiff, setDiffFlags } from './git/ops/diff';
 import {
   applyPatchToIndex,
   applyPatchToWorktree,
@@ -39,7 +46,13 @@ import {
   unstageFile,
   unstagePaths,
 } from './git/ops/indexOps';
-import { createCommit, getLastCommitMessage, type CommitOptions } from './git/ops/commit';
+import {
+  createCommit,
+  getLastCommitMessage,
+  getRecentCommitMessages,
+  undoLastCommit,
+  type CommitOptions,
+} from './git/ops/commit';
 import {
   cherryPick,
   cherryPickAbort,
@@ -73,6 +86,7 @@ import { createTag, deleteTag } from './git/ops/tag';
 import { stashFileDiff, stashFiles } from './git/ops/stash';
 import {
   approveCredentials,
+  deleteRemoteBranch,
   fetchRemote,
   humanizeRemoteError,
   isAuthError,
@@ -150,6 +164,32 @@ export type FileTabKey = 'worktree' | string;
 export type Theme = 'dark' | 'light' | 'system';
 
 export type BottomPanel = 'none' | 'commit' | 'log';
+
+/** diff 展示选项；ignoreWhitespace/ignoreEol 会作为参数传给 git diff，wordWrap 纯 CSS */
+export interface DiffFlags {
+  ignoreWhitespace: boolean;
+  ignoreEol: boolean;
+  wordWrap: boolean;
+}
+
+const DIFF_FLAGS_KEY = 'gitdesk.diffFlags';
+
+function loadDiffFlags(): DiffFlags {
+  try {
+    const raw = localStorage.getItem(DIFF_FLAGS_KEY);
+    if (raw) {
+      const o = JSON.parse(raw) as Partial<DiffFlags>;
+      return {
+        ignoreWhitespace: o.ignoreWhitespace === true,
+        ignoreEol: o.ignoreEol === true,
+        wordWrap: o.wordWrap === true,
+      };
+    }
+  } catch {
+    /* 忽略坏数据 */
+  }
+  return { ignoreWhitespace: false, ignoreEol: false, wordWrap: false };
+}
 
 function errMsg(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -232,6 +272,9 @@ interface AppStore {
   /** 行内差异高亮开关 */
   wordDiff: boolean;
   toggleWordDiff: () => void;
+  /** diff 展示选项：忽略空白 / 忽略换行符差异 / 自动换行（影响重新拉取 diff 的命令行参数） */
+  diffFlags: DiffFlags;
+  setDiffFlag: (key: keyof DiffFlags, value: boolean) => Promise<void>;
   /** 当前加载深度（每次「加载更多」+LOG_PAGE） */
   logLimit: number;
   loadMoreLog: () => Promise<void>;
@@ -271,7 +314,9 @@ interface AppStore {
   closeRepo: () => void;
   removeRecent: (path: string) => void;
   refreshRepoBranches: () => Promise<void>;
-  refresh: () => Promise<void>;
+  refresh: (opts?: { force?: boolean }) => Promise<void>;
+  /** 只刷新提交历史（翻页/搜索/切范围用，不重跑 status/refs/stash 等八条命令） */
+  refreshLog: () => Promise<void>;
   /** 只刷新变更与引用（文件监听触发，轻量） */
   refreshLight: () => Promise<void>;
   clearError: () => void;
@@ -313,18 +358,22 @@ interface AppStore {
   cherryPickOp: (sha: string) => Promise<void>;
   /** 生成反向提交 */
   revertOp: (sha: string) => Promise<void>;
+  /** 撤销最后一次提交（reset --soft：改动回到暂存区） */
+  undoLastCommitOp: (sha: string) => Promise<void>;
   continueOp: () => Promise<void>;
   skipOp: () => Promise<void>;
   abortOp: () => Promise<void>;
 
   lastCommitMessage: () => Promise<string>;
+  /** 最近若干条提交信息（提交面板的「最近消息」下拉用） */
+  lastCommitMessages: () => Promise<string[]>;
   doCommit: (opts: CommitOptions) => Promise<boolean>;
   setBottomPanel: (p: BottomPanel) => void;
 
   createBranchOp: (name: string) => Promise<void>;
   switchBranchOp: (name: string) => Promise<void>;
   deleteBranchOp: (name: string) => Promise<void>;
-  mergeBranchOp: (name: string) => Promise<void>;
+  mergeBranchOp: (name: string, squash?: boolean) => Promise<void>;
   rebaseOntoOp: (name: string) => Promise<void>;
 
   stashSaveOp: (message: string) => Promise<void>;
@@ -340,6 +389,8 @@ interface AppStore {
   fetchOp: () => Promise<void>;
   pullOp: (strategy: 'ff-only' | 'rebase' | 'merge') => Promise<void>;
   pushOp: (force: boolean) => Promise<void>;
+  /** 删除远端分支（push :refs/heads/<name>），本地分支不受影响 */
+  deleteRemoteBranchOp: (remote: string, branch: string) => Promise<void>;
 }
 
 const EMPTY_REPO_STATE = {
@@ -361,6 +412,7 @@ const EMPTY_REPO_STATE = {
   pickedPaths: [] as string[],
   fileAnchor: null,
   wordDiff: localStorage.getItem('gitdesk.wordDiff') !== '0',
+  diffFlags: loadDiffFlags(),
   compareInfo: null,
   credRequest: null,
   stagedStat: null,
@@ -387,6 +439,8 @@ let pendingRetry: (() => Promise<void>) | null = null;
 
 let unlistenChanged: UnlistenFn | null = null;
 let watchTimer: ReturnType<typeof setTimeout> | null = null;
+/** refreshRepoBranches 的节流时间戳：左栏分支名不必每次 refresh 都重读 */
+let lastBranchesAt = 0;
 
 /** 开始监听仓库：磁盘一变就让 UI 自己跟上，不用手动 F5 */
 async function startWatch(path: string): Promise<void> {
@@ -420,6 +474,9 @@ function stopWatch(): void {
 }
 
 export const useStore = create<AppStore>()((set, get) => {
+  // 启动时把持久化的 diff 选项同步给 ops 层的模块级变量
+  setDiffFlags(EMPTY_REPO_STATE.diffFlags);
+
   function getRepoPath(): string {
     const repo = get().repo;
     if (!repo) throw new Error('没有打开仓库');
@@ -431,6 +488,9 @@ export const useStore = create<AppStore>()((set, get) => {
     const repo = get().repo;
     if (!repo) return false;
     set({ busy: label, error: null });
+    // 整个写操作期间（含 backup 与后续刷新）文件监听保持安静，
+    // 避免长命令（rebase/钩子）执行中的 .git 写入触发并发 refresh
+    beginWriteWindow();
     try {
       if (backup) await createBackup(repo.path, label);
       await fn();
@@ -440,13 +500,14 @@ export const useStore = create<AppStore>()((set, get) => {
       set({ error: errMsg(e) });
       return false;
     } finally {
+      endWriteWindow();
       set({ busy: null });
     }
   }
 
   /** 刷新数据并尽量保持当前 diff 视角 */
   async function reload(): Promise<void> {
-    await get().refresh();
+    await get().refresh({ force: true });
     const target = get().target;
     if (!target || target.kind === 'commit') return;
 
@@ -656,6 +717,9 @@ export const useStore = create<AppStore>()((set, get) => {
         set({ repo, recent, bottomPanel: 'none' });
         await startWatch(repo.path);
         await get().refresh();
+        // 刚打开的仓库立刻读一次当前分支（左栏显示 name (branch)）
+        lastBranchesAt = Date.now();
+        void get().refreshRepoBranches();
       } catch (e) {
         set({ error: errMsg(e), repo: null });
       } finally {
@@ -694,9 +758,11 @@ export const useStore = create<AppStore>()((set, get) => {
       set({ repoBranches: map });
     },
 
-    async refresh() {
+    async refresh(opts?: { force?: boolean }) {
       const repo = get().repo;
       if (!repo) return;
+      // 有操作正在进行时，文件监听/手动触发的刷新直接让路（mutate 内部的 reload 用 force 穿透）
+      if (get().busy && !opts?.force) return;
       set({ busy: '刷新…', error: null });
       try {
         const search = get().logQuery;
@@ -779,6 +845,53 @@ export const useStore = create<AppStore>()((set, get) => {
       } finally {
         set({ busy: null });
       }
+      // 左栏「name (branch)」显示：仓库列表的分支名会随切分支变化，节流重读
+      if (Date.now() - lastBranchesAt > 15_000) {
+        lastBranchesAt = Date.now();
+        void get().refreshRepoBranches();
+      }
+    },
+
+    /**
+     * 只刷新提交历史。翻页、搜索、切范围只需要 log + graph，
+     * 不必重跑 status/refs/stash/backup/remotes 那一套（大仓库上 status 本身就不便宜）。
+     */
+    async refreshLog() {
+      const repo = get().repo;
+      if (!repo) return;
+      set({ busy: '刷新…', error: null });
+      try {
+        const search = get().logQuery;
+        const commits =
+          search && search.text.trim()
+            ? await searchLog(repo.path, get().logLimit, search, get().logScope)
+            : await getLog(repo.path, get().logLimit, get().logScope);
+
+        const current = get().selectedSha;
+        set({ commits, graph: layoutGraph(commits) });
+        if (!current || !commits.some((c) => c.sha === current)) {
+          set({ selectedSha: commits[0]?.sha ?? null });
+        }
+
+        // 页签合法性：已消失的提交要清理掉（stash 页签沿用当前 stashes 状态判断）
+        const stashes = get().stashes;
+        const tabs = get().commitTabs.filter((t) =>
+          t.kind === 'stash'
+            ? stashes.some((s) => `stash:${s.ref}` === t.key)
+            : t.kind === 'compare'
+              ? true
+              : commits.some((c) => c.sha === t.key),
+        );
+        let tab = get().fileTab;
+        if (tab !== 'worktree' && !tabs.some((t) => t.key === tab)) tab = 'worktree';
+        if (tabs.length !== get().commitTabs.length || tab !== get().fileTab) {
+          set({ commitTabs: tabs, fileTab: tab });
+        }
+      } catch (e) {
+        set({ error: errMsg(e) });
+      } finally {
+        set({ busy: null });
+      }
     },
 
     /** 只刷变更与引用：文件监听触发时用，不重拉日志、不动当前 diff */
@@ -805,12 +918,12 @@ export const useStore = create<AppStore>()((set, get) => {
     setLogQuery(mode, text) {
       // 换搜索条件就回到第一页
       set({ logQuery: text.trim() ? { mode, text } : null, logLimit: LOG_PAGE });
-      void get().refresh();
+      void get().refreshLog();
     },
 
     clearLogQuery() {
       set({ logQuery: null, logLimit: LOG_PAGE });
-      void get().refresh();
+      void get().refreshLog();
     },
 
     pickFile(path, mode, order) {
@@ -874,10 +987,34 @@ export const useStore = create<AppStore>()((set, get) => {
       set({ wordDiff: next });
     },
 
+    /** 改 diff 选项后要重拉当前文件的 diff（命令行参数变了，结果不同） */
+    async setDiffFlag(key: keyof DiffFlags, value: boolean): Promise<void> {
+      const next = { ...get().diffFlags, [key]: value };
+      try {
+        localStorage.setItem(DIFF_FLAGS_KEY, JSON.stringify(next));
+      } catch {
+        /* 忽略配额错误 */
+      }
+      set({ diffFlags: next });
+      setDiffFlags(next);
+      // wordWrap 纯 CSS，不用重新跑 git
+      if (key === 'wordWrap') return;
+      const repo = get().repo;
+      const target = get().target;
+      if (!repo || !target || get().conflictSides) return;
+      if (target.kind === 'file') {
+        const entry = get().status?.entries.find((e) => e.path === target.path);
+        if (entry) await loadFileDiff(entry, false);
+        return;
+      }
+      // commit / stash / compare 页签：重取当前文件的 diff
+      await get().showTabFile({ path: target.path, status: 'M' });
+    },
+
     /** 加载下一页：加大深度后整段重取（几千行的解析是毫秒级，比增量拼接更不容易错） */
     async loadMoreLog() {
       set({ logLimit: get().logLimit + LOG_PAGE });
-      await get().refresh();
+      await get().refreshLog();
     },
 
     async openCommit(sha) {
@@ -955,7 +1092,7 @@ export const useStore = create<AppStore>()((set, get) => {
 
     setLogScope(scope) {
       set({ logScope: scope });
-      void get().refresh();
+      void get().refreshLog();
     },
 
     openDiffModal() {
@@ -1229,6 +1366,23 @@ export const useStore = create<AppStore>()((set, get) => {
       });
     },
 
+    /** 撤销最后一次提交：改动完整回到暂存区，不改写任何历史内容 */
+    async undoLastCommitOp(sha) {
+      const ok = await confirmBox({
+        title: `撤销提交 ${sha.slice(0, 7)}？`,
+        body: '相当于 git reset --soft HEAD~1：提交消失，改动全部回到暂存区。只对本地未推送的提交使用。',
+        okText: '撤销',
+        danger: true,
+      });
+      if (!ok) return;
+      await mutate('撤销提交', true, async () => {
+        const res = await undoLastCommit(getRepoPath());
+        if (res.code !== 0) {
+          throw new Error(res.stderr.trim() || '撤销失败（根提交或历史不连续时无法撤销）');
+        }
+      });
+    },
+
     async continueOp() {
       const op = get().ongoing;
       if (!op) return;
@@ -1285,10 +1439,17 @@ export const useStore = create<AppStore>()((set, get) => {
       return getLastCommitMessage(repo.path);
     },
 
+    async lastCommitMessages() {
+      const repo = get().repo;
+      if (!repo) return [];
+      return getRecentCommitMessages(repo.path);
+    },
+
     async doCommit(opts) {
       const repo = get().repo;
       if (!repo) return false;
       set({ busy: opts.amend ? '修正提交…' : '提交…', error: null });
+      beginWriteWindow();
       try {
         const res = await createCommit(repo.path, opts);
         if (res.code !== 0) {
@@ -1302,6 +1463,7 @@ export const useStore = create<AppStore>()((set, get) => {
         set({ error: errMsg(e) });
         return false;
       } finally {
+        endWriteWindow();
         set({ busy: null });
       }
     },
@@ -1345,9 +1507,9 @@ export const useStore = create<AppStore>()((set, get) => {
       });
     },
 
-    async mergeBranchOp(name) {
-      await mutate(`合并 ${name}`, true, async () => {
-        const res = await mergeBranch(getRepoPath(), name);
+    async mergeBranchOp(name, squash = false) {
+      await mutate(squash ? `Squash 合并 ${name}` : `合并 ${name}`, true, async () => {
+        const res = await mergeBranch(getRepoPath(), name, squash);
         if (res.code !== 0) {
           const msg = res.stderr.trim() || res.stdout.trim();
           // 冲突不算失败，提示去解决
@@ -1356,6 +1518,10 @@ export const useStore = create<AppStore>()((set, get) => {
             throw new Error(`${msg}\n\n有冲突，请在「变更」里逐个解决。`);
           }
           throw new Error(msg || '合并失败');
+        }
+        if (squash) {
+          // --squash 只把改动放进暂存区，不产生提交——打开提交面板提示用户收尾
+          set({ bottomPanel: 'commit' });
         }
       });
     },
@@ -1488,6 +1654,7 @@ export const useStore = create<AppStore>()((set, get) => {
       const remote = get().remote;
       const attempt = async (): Promise<void> => {
         set({ busy: `获取 ${remote}…`, error: null });
+        beginWriteWindow(); // fetch 会写 FETCH_HEAD / 远程引用，同样会让监听自激
         try {
           const res = await fetchRemote(getRepoPath(), remote);
           if (res.code !== 0) {
@@ -1503,6 +1670,7 @@ export const useStore = create<AppStore>()((set, get) => {
         } catch (e) {
           set({ error: errMsg(e) });
         } finally {
+          endWriteWindow();
           set({ busy: null });
         }
       };
@@ -1514,6 +1682,7 @@ export const useStore = create<AppStore>()((set, get) => {
       if (!repo) return;
       const attempt = async (): Promise<void> => {
         set({ busy: `拉取（${strategy}）…`, error: null });
+        beginWriteWindow();
         try {
           await createBackup(repo.path, 'pull');
           const res = await pullRemote(repo.path, strategy);
@@ -1530,6 +1699,7 @@ export const useStore = create<AppStore>()((set, get) => {
         } catch (e) {
           set({ error: errMsg(e) });
         } finally {
+          endWriteWindow();
           set({ busy: null });
         }
       };
@@ -1556,6 +1726,7 @@ export const useStore = create<AppStore>()((set, get) => {
       const setUpstream = !status?.branch.upstream;
       const attempt = async (): Promise<void> => {
         set({ busy: `推送 ${branch} → ${remote}…`, error: null });
+        beginWriteWindow();
         try {
           const res = await pushRemote(getRepoPath(), { remote, branch, force, setUpstream });
           if (res.code !== 0) {
@@ -1571,10 +1742,27 @@ export const useStore = create<AppStore>()((set, get) => {
         } catch (e) {
           set({ error: errMsg(e) });
         } finally {
+          endWriteWindow();
           set({ busy: null });
         }
       };
       await attempt();
+    },
+
+    async deleteRemoteBranchOp(remote, branch) {
+      const ok = await confirmBox({
+        title: `删除远程分支 ${remote}/${branch}？`,
+        body: '会直接从远端删除该分支（本地分支不受影响）。别人可能还在基于它工作，确认没有协作者依赖后再删。',
+        okText: '删除',
+        danger: true,
+      });
+      if (!ok) return;
+      await mutate(`删除远程分支 ${remote}/${branch}`, false, async () => {
+        const res = await deleteRemoteBranch(getRepoPath(), remote, branch);
+        if (res.code !== 0) {
+          throw new Error(humanizeRemoteError(res.stderr.trim() || res.stdout.trim()));
+        }
+      });
     },
   };
 });

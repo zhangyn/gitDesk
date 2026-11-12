@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { drawGraph, graphWidthFor, ROW_HEIGHT } from './graph/drawGraph';
+import { copyText } from '../ui/clipboard';
 
 const DATE_FMT = new Intl.DateTimeFormat('zh-CN', {
   month: '2-digit',
@@ -12,6 +13,8 @@ const DATE_FMT = new Intl.DateTimeFormat('zh-CN', {
 /** 距离底部多少像素就开始加载下一页 */
 const LOAD_MORE_THRESHOLD = 320;
 const MORE_BAR_HEIGHT = 34;
+/** DOM 行虚拟化：视口外上下各多渲染几行，滚动时不露白 */
+const OVERSCAN = 10;
 
 function shortSha(sha: string): string {
   return sha.slice(0, 7);
@@ -48,7 +51,10 @@ export function CommitList() {
     return () => clearTimeout(t);
   }, [searchText, searchMode, logQuery, setLogQuery]);
 
-  const [hover, setHover] = useState(-1);
+  // hover 不进 React state：一旦进 state，鼠标扫过列表会触发整列 reconcile。
+  // 存 ref + 直接重绘 canvas，DOM 行的高亮交给 CSS :hover。
+  const hoverRef = useRef(-1);
+  const redrawRef = useRef<() => void>(() => {});
   // 满了这一页就可能还有下一页
   const hasMore = commits.length >= logLimit;
   const [viewWidth, setViewWidth] = useState(0);
@@ -117,11 +123,21 @@ export function CommitList() {
       if (!sha) return;
       if (next !== selectedIndex) void openCommit(sha);
       requestAnimationFrame(() => {
-        const rows = scrollRef.current?.querySelectorAll('.commit-row');
-        rows?.[next]?.scrollIntoView({ block: 'nearest' });
+        const el = scrollRef.current;
+        if (!el) return;
+        // 行是虚拟化的：目标行可能没渲染，直接算 scrollTop 把它居中
+        const top = next * ROW_HEIGHT;
+        const view = el.clientHeight - ROW_HEIGHT;
+        const target =
+          top < el.scrollTop
+            ? Math.max(0, top - view / 2)
+            : top > el.scrollTop + view
+              ? Math.min(rowsHeight - el.clientHeight, top - view / 2)
+              : el.scrollTop;
+        if (target !== el.scrollTop) el.scrollTop = target;
       });
     },
-    [graph, selectedIndex, openCommit],
+    [graph, selectedIndex, openCommit, rowsHeight],
   );
 
   const onKeyDown = useCallback(
@@ -167,15 +183,39 @@ export function CommitList() {
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || viewWidth === 0 || viewHeight === 0) return;
-    drawGraph(canvas, graph, {
-      width: viewWidth,
-      graphWidth: width,
-      viewportHeight: viewHeight,
-      scrollTop,
-      selectedIndex,
-      hoverIndex: hover,
-    });
-  }, [graph, width, viewWidth, viewHeight, scrollTop, selectedIndex, hover]);
+    const draw = () => {
+      drawGraph(canvas, graph, {
+        width: viewWidth,
+        graphWidth: width,
+        viewportHeight: viewHeight,
+        scrollTop,
+        selectedIndex,
+        hoverIndex: hoverRef.current,
+      });
+    };
+    redrawRef.current = draw;
+    draw();
+  }, [graph, width, viewWidth, viewHeight, scrollTop, selectedIndex]);
+
+  /** 鼠标移动 → 算出行号 → 变了才重绘 canvas（不走 React state，避免整列 reconcile） */
+  const onMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const idx = Math.floor((e.clientY - rect.top + scrollTop) / ROW_HEIGHT);
+      if (idx !== hoverRef.current) {
+        hoverRef.current = idx;
+        redrawRef.current();
+      }
+    },
+    [scrollTop],
+  );
+
+  const onMouseLeave = useCallback(() => {
+    if (hoverRef.current !== -1) {
+      hoverRef.current = -1;
+      redrawRef.current();
+    }
+  }, []);
 
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -247,6 +287,15 @@ export function CommitList() {
     );
   }
 
+  // DOM 行虚拟化：只渲染视口内（±OVERSCAN）的行。
+  // canvas 已经按视口裁剪，DOM 也要跟上——否则几千行时每次滚动都要 reconcile 全部行。
+  const firstRow = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
+  const lastRow = Math.min(
+    graph.length,
+    Math.ceil((scrollTop + Math.max(viewHeight, 1)) / ROW_HEIGHT) + OVERSCAN,
+  );
+  const visibleRows = graph.slice(firstRow, lastRow);
+
   return (
     <>
       {head}
@@ -256,12 +305,15 @@ export function CommitList() {
           className="commit-scroll"
           ref={attachScroll}
           onScroll={onScroll}
+          onMouseMove={onMouseMove}
+          onMouseLeave={onMouseLeave}
           tabIndex={0}
           onKeyDown={onKeyDown}
           onMouseDown={() => scrollRef.current?.focus({ preventScroll: true })}
         >
           <div className="commit-inner" style={{ height: innerHeight }}>
-            {graph.map((row, i) => {
+            {visibleRows.map((row, k) => {
+              const i = firstRow + k;
               const c = bySha.get(row.sha);
               if (!c) return null;
               return (
@@ -269,8 +321,6 @@ export function CommitList() {
                   key={`${row.sha}-${i}`}
                   className={`commit-row${i === selectedIndex ? ' is-selected' : ''}`}
                   style={{ top: i * ROW_HEIGHT, paddingLeft: width + 6 }}
-                  onMouseEnter={() => setHover(i)}
-                  onMouseLeave={() => setHover(-1)}
                   onClick={() => void openCommit(c.sha)}
                 >
                   {c.refs.length > 0 && (
@@ -288,6 +338,16 @@ export function CommitList() {
                   <span className="author">{c.authorName}</span>
                   <span className="date">{DATE_FMT.format(new Date(c.authorDate * 1000))}</span>
                   <span className="sha mono">{shortSha(c.sha)}</span>
+                  <button
+                    className="row-copy"
+                    title="复制完整 SHA"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void copyText(c.sha);
+                    }}
+                  >
+                    ⧉
+                  </button>
                 </div>
               );
             })}

@@ -64,6 +64,14 @@ export async function pushRemote(repoPath: string, opts: PushOptions) {
   return runGit(args, { cwd: repoPath, timeoutMs: 600_000 });
 }
 
+/** 删除远端分支（refspec 冒号前留空 = 删除）。本地分支不受影响。 */
+export async function deleteRemoteBranch(repoPath: string, remote: string, branch: string) {
+  return runGit(['push', remote, `:refs/heads/${branch}`], {
+    cwd: repoPath,
+    timeoutMs: 180_000,
+  });
+}
+
 /** git 远程错误太长，抽出一句人话 */
 export function humanizeRemoteError(stderr: string): string {
   const s = stderr.trim();

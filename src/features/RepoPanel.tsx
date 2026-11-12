@@ -9,6 +9,7 @@ import { IconFolder } from '../ui/icons';
 export function RepoPanel() {
   const repo = useStore((s) => s.repo);
   const recent = useStore((s) => s.recent);
+  const repoBranches = useStore((s) => s.repoBranches);
   const openPath = useStore((s) => s.openPath);
   const pickRepo = useStore((s) => s.pickRepo);
   const removeRecent = useStore((s) => s.removeRecent);
@@ -49,6 +50,10 @@ export function RepoPanel() {
                 >
                   <IconFolder size={13} className="repo-item-icon" />
                   <span className="repo-item-name">{r.name}</span>
+                  {/* SmartGit 式的 name (branch)：一眼看出每个仓库停在哪条分支 */}
+                  {repoBranches[r.path] && (
+                    <span className="repo-item-branch">({repoBranches[r.path]})</span>
+                  )}
                 </button>
                 <span className="row-actions">
                   <button

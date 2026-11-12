@@ -1,5 +1,6 @@
 import type { CommitFile, FilePatch } from '../../types';
 import { parsePatches } from '../../parse/diff';
+import { diffViewArgs } from './diff';
 import { runGit } from '../runner';
 
 export interface StashEntry {
@@ -68,7 +69,7 @@ export async function stashFileDiff(
   path: string,
 ): Promise<FilePatch[]> {
   const res = await runGit(
-    ['diff', '--no-color', '--no-ext-diff', '-U3', `${ref}^1`, ref, '--', path],
+    ['diff', '--no-color', '--no-ext-diff', '-U3', ...diffViewArgs(), `${ref}^1`, ref, '--', path],
     { cwd: repoPath, timeoutMs: 60_000 },
   );
   return parsePatches(res.stdout);

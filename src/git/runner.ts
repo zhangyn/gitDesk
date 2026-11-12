@@ -25,8 +25,23 @@ export function setOneShotAuth(auth: { user: string; pass: string } | null): voi
 const AUTH_HELPER = '!f() { echo username=$GD_USER; echo password=$GD_PASS; }; f';
 
 let suppressUntil = 0;
+/** 进行中的写操作计数：>0 时监听事件一律静默（长命令执行期间的 .git 写入也覆盖到） */
+let writeDepth = 0;
+
 export function watcherSuppressed(): boolean {
-  return Date.now() < suppressUntil;
+  return writeDepth > 0 || Date.now() < suppressUntil;
+}
+
+/**
+ * 写操作（add/commit/checkout…）开始前调用：整个执行期间文件监听保持安静，
+ * 结束后由 endWriteWindow 恢复。用计数器支持嵌套（mutate 里还可能调 createBackup）。
+ */
+export function beginWriteWindow(): void {
+  writeDepth += 1;
+}
+
+export function endWriteWindow(): void {
+  writeDepth = Math.max(0, writeDepth - 1);
 }
 
 export function setGitPath(p: string): void {

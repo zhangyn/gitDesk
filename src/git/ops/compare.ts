@@ -1,5 +1,6 @@
 import type { CommitFile, FilePatch } from '../../types';
 import { parsePatches } from '../../parse/diff';
+import { diffViewArgs } from './diff';
 import { runGit, runGitChecked } from '../runner';
 
 export interface CompareResult {
@@ -68,10 +69,13 @@ export async function compareFileDiff(
   bSha: string,
   path: string,
 ): Promise<FilePatch[]> {
-  const res = await runGit(['diff', '--no-color', '--no-ext-diff', '-U3', aSha, bSha, '--', path], {
-    cwd: repoPath,
-    timeoutMs: 60_000,
-  });
+  const res = await runGit(
+    ['diff', '--no-color', '--no-ext-diff', '-U3', ...diffViewArgs(), aSha, bSha, '--', path],
+    {
+      cwd: repoPath,
+      timeoutMs: 60_000,
+    },
+  );
   return parsePatches(res.stdout);
 }
 

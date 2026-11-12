@@ -146,6 +146,8 @@ export function Toolbar() {
   const theme = useStore((s) => s.theme);
   const setTheme = useStore((s) => s.setTheme);
   const [compareOpen, setCompareOpen] = useState(false);
+  /** 合并弹层里的 squash 开关：勾上后选分支执行 git merge --squash */
+  const [squash, setSquash] = useState(false);
 
   const counts = countEntries(status);
   const branch = status?.branch.head ?? null;
@@ -278,7 +280,11 @@ export function Toolbar() {
         trigger={<TB icon={IconMerge} label="合并" caret disabled={disabled || noRepo} />}
       >
         <div className="menu-title">合并到 {branch ?? '当前分支'}</div>
-        <BranchPicker exclude={branch} onPick={(n) => void mergeBranchOp(n)} />
+        <label className="menu-check" title="git merge --squash：改动进暂存区，不产生合并提交">
+          <input type="checkbox" checked={squash} onChange={(e) => setSquash(e.target.checked)} />
+          Squash 合并（不建合并提交）
+        </label>
+        <BranchPicker exclude={branch} onPick={(n) => void mergeBranchOp(n, squash)} />
       </Popover>
 
       <Popover
