@@ -3210,3 +3210,24 @@ body.is-resizing-x {
 .splitter.hsplit {
   cursor: col-resize;
 }
+
+/* ==================== v11：图勾选 / Reflog / 收藏 ==================== */
+
+/* 分支行前的勾选框：勾选 = 参与 SmartGit 式提交图 */
+.ref-check {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  margin: 0 2px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.ref-row.is-current .ref-check {
+  opacity: 0.55;
+}
+
+/* 收藏的仓库行 */
+.repo-item.is-fav .repo-item-name {
+  color: var(--accent);
+}

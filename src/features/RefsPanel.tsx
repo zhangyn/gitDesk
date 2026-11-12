@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { promptBox } from '../ui/dialog';
 
@@ -9,6 +9,7 @@ function Section({
   children,
   defaultOpen = true,
   dense,
+  onOpen,
 }: {
   title: string;
   count?: number;
@@ -16,6 +17,8 @@ function Section({
   children: React.ReactNode;
   defaultOpen?: boolean;
   dense?: boolean;
+  /** 区块展开时回调（懒加载数据用，例如 Reflog） */
+  onOpen?: () => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   // 数据是异步来的：首次渲染时 count 还是 0，所以 defaultOpen 可能是 false。
@@ -31,7 +34,15 @@ function Section({
   return (
     <div className={`section${dense ? ' dense' : ''}`}>
       <div className="section-bar">
-        <button className="section-head" onClick={() => setOpen((v) => !v)}>
+        <button
+          className="section-head"
+          onClick={() => {
+            setOpen((v) => {
+              if (!v) onOpen?.();
+              return !v;
+            });
+          }}
+        >
           <span className={`chev${open ? ' open' : ''}`}>▸</span>
           <span>{title}</span>
           {typeof count === 'number' && <span className="count">{count}</span>}
@@ -79,6 +90,13 @@ export function RefsPanel() {
   const stashSaveOp = useStore((s) => s.stashSaveOp);
   const restoreBackupOp = useStore((s) => s.restoreBackupOp);
   const deleteRemoteBranchOp = useStore((s) => s.deleteRemoteBranchOp);
+  const excludedRefs = useStore((s) => s.excludedRefs);
+  const toggleGraphRef = useStore((s) => s.toggleGraphRef);
+  const reflog = useStore((s) => s.reflog);
+  const loadReflog = useStore((s) => s.loadReflog);
+  const openCommit = useStore((s) => s.openCommit);
+
+  const excludedSet = useMemo(() => new Set(excludedRefs), [excludedRefs]);
 
   // 分支/远程/标签多时一个过滤框比逐组翻找快得多（SmartGit 的 speed search 思路）
   const [query, setQuery] = useState('');
@@ -156,12 +174,27 @@ export function RefsPanel() {
       >
         {branches.map((b) => {
           const current = b.name === head;
+          const inGraph = current || !excludedSet.has(b.fullName);
           return (
             <div
               key={b.name}
               className={`ref-row${current ? ' is-current' : ''}`}
               title={`${b.name}${b.upstream ? `\n上游：${b.upstream}` : '\n没有上游分支'}\n双击切换到该分支`}
             >
+              <input
+                type="checkbox"
+                className="ref-check"
+                checked={inGraph}
+                disabled={current}
+                title={
+                  current
+                    ? '当前分支始终参与提交图'
+                    : inGraph
+                      ? '参与提交图（取消勾选可收起这条开发线）'
+                      : '已从提交图排除（勾选恢复显示）'
+                }
+                onChange={() => void toggleGraphRef(b.fullName)}
+              />
               <button className="ref-main" onDoubleClick={() => void switchBranchOp(b.name)}>
                 <span className="dot dot-branch" />
                 <span className="ref-name">{b.name}</span>
@@ -208,6 +241,17 @@ export function RefsPanel() {
               if (local) await createTrackingBranchOp(local.trim(), r.name);
             }}
           >
+            <input
+              type="checkbox"
+              className="ref-check"
+              checked={!excludedSet.has(r.fullName)}
+              title={
+                excludedSet.has(r.fullName)
+                  ? '已从提交图排除（勾选恢复显示）'
+                  : '参与提交图（取消勾选可收起这条远程开发线）'
+              }
+              onChange={() => void toggleGraphRef(r.fullName)}
+            />
             <span className="dot dot-remote" />
             <span className="ref-name">{r.name}</span>
             <span className="row-actions">
@@ -336,6 +380,35 @@ export function RefsPanel() {
                 ↩
               </button>
             </span>
+          </div>
+        ))}
+      </Section>
+
+      <Section
+        title="Reflog"
+        count={reflog.length}
+        defaultOpen={false}
+        onOpen={() => {
+          if (reflog.length === 0) void loadReflog();
+        }}
+        action={
+          <button
+            className="icon-btn"
+            title="重新读取 HEAD 移动记录"
+            onClick={() => void loadReflog()}
+          >
+            ↻
+          </button>
+        }
+      >
+        {reflog.length === 0 && <div className="empty-hint small">还没有记录；点 ↻ 读取</div>}
+        {reflog.map((e, i) => (
+          <div key={i} className="ref-row" title={`${e.message}\n${e.sha}\n单击查看这个提交`}>
+            <button className="ref-main" onClick={() => void openCommit(e.sha)}>
+              <span className="dot dot-backup" />
+              <span className="ref-name">{e.message}</span>
+              <span className="stash-ref mono">{e.sha.slice(0, 7)}</span>
+            </button>
           </div>
         ))}
       </Section>

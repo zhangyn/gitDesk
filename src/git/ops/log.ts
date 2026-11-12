@@ -1,6 +1,6 @@
 import type { Commit, CommitFile } from '../../types';
 import { parseLog } from '../../parse/log';
-import { runGitChecked } from '../runner';
+import { runGit, runGitChecked } from '../runner';
 
 /** %x1f 分隔字段，%x1e 分隔记录 —— 与 parse/log.ts 一一对应 */
 const LOG_FORMAT =
@@ -53,14 +53,42 @@ export async function getLog(
   repoPath: string,
   limit = 400,
   scope: LogScope = 'local',
+  /** 不参与提交图的完整 refname 列表（refs/heads/x、refs/remotes/o/x），按 `--not` 排除 */
+  exclude: string[] = [],
 ): Promise<Commit[]> {
   // --tags：只在标签上可达的提交也要出现在历史里
   const refs = scope === 'all' ? ['--all'] : ['--branches', '--tags', 'HEAD'];
-  const res = await runGitChecked(
-    ['log', ...refs, '--topo-order', '-n', String(limit), `--format=${LOG_FORMAT}`],
-    { cwd: repoPath, timeoutMs: 30_000 },
-  );
+  const args = ['log', ...refs];
+  if (exclude.length > 0) args.push('--not', ...exclude);
+  args.push('--topo-order', '-n', String(limit), `--format=${LOG_FORMAT}`);
+  const res = await runGitChecked(args, { cwd: repoPath, timeoutMs: 30_000 });
   return parseLog(res.stdout);
+}
+
+/* ------------------------------------------------------------------ reflog */
+
+export interface ReflogEntry {
+  sha: string;
+  /** reflog 的一行描述，例如 "checkout: moving from main to feature-x" */
+  message: string;
+}
+
+/** HEAD 的移动记录：切分支、reset、commit 都会留痕，找回"丢了"的提交就靠它 */
+export async function getReflog(repoPath: string, limit = 40): Promise<ReflogEntry[]> {
+  const res = await runGit(['reflog', '-n', String(limit), '--format=%H%x1f%gs'], {
+    cwd: repoPath,
+    quiet: true,
+    timeoutMs: 20_000,
+  });
+  if (res.code !== 0) return [];
+  const out: ReflogEntry[] = [];
+  for (const line of res.stdout.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const i = line.indexOf('\x1f');
+    if (i <= 0) continue;
+    out.push({ sha: line.slice(0, i), message: line.slice(i + 1) });
+  }
+  return out;
 }
 
 /**

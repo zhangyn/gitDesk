@@ -29,9 +29,11 @@ import {
   getCommitBody,
   getCommitFiles,
   getLog,
+  getReflog,
   searchLog,
   type LogScope,
   type LogSearch,
+  type ReflogEntry,
 } from './git/ops/log';
 import { compareFileDiff, compareFiles, compareStat, resolveRev } from './git/ops/compare';
 import { getRefs } from './git/ops/refs';
@@ -39,6 +41,8 @@ import { getCommitDiff, getUntrackedDiff, getWorktreeDiff, setDiffFlags } from '
 import {
   applyPatchToIndex,
   applyPatchToWorktree,
+  cleanPreview,
+  cleanUntracked,
   discardFileChanges,
   stageAll,
   stageFile,
@@ -80,6 +84,7 @@ import {
   listStashes,
   restoreBackup,
   saveStash,
+  saveStashPaths,
   type BackupEntry,
   type StashEntry,
 } from './git/ops/stash';
@@ -218,6 +223,32 @@ function saveRecent(list: RepoEntry[]): void {
   }
 }
 
+/* ------------------------------------------- 提交图排除的 ref（按仓库持久化） */
+
+function graphExcludesKey(repoPath: string): string {
+  return `gitdesk.graphExcludes:${repoPath}`;
+}
+
+function loadGraphExcludes(repoPath: string): string[] {
+  try {
+    const raw = localStorage.getItem(graphExcludesKey(repoPath));
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as unknown;
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((x): x is string => typeof x === 'string');
+  } catch {
+    return [];
+  }
+}
+
+function saveGraphExcludes(repoPath: string, list: string[]): void {
+  try {
+    localStorage.setItem(graphExcludesKey(repoPath), JSON.stringify(list));
+  } catch {
+    /* 忽略配额错误 */
+  }
+}
+
 function pickSide(worktree: FilePatch[], staged: FilePatch[]): Side {
   if (worktree.length > 0) return 'worktree';
   return staged.length > 0 ? 'staged' : 'worktree';
@@ -248,6 +279,10 @@ interface AppStore {
   graph: GraphRow[];
   stashes: StashEntry[];
   backups: BackupEntry[];
+  /** 不参与提交图的完整 refname（refs/heads/x、refs/remotes/o/x）；治多分支泳道爆炸 */
+  excludedRefs: string[];
+  /** HEAD 移动记录（Reflog 面板，展开区块时懒加载） */
+  reflog: ReflogEntry[];
   ongoing: string | null;
   remotes: RemoteInfo[];
   remote: string;
@@ -315,6 +350,8 @@ interface AppStore {
   closeRepo: () => void;
   removeRecent: (path: string) => void;
   refreshRepoBranches: () => Promise<void>;
+  /** 勾/取消一个 ref 参与提交图（SmartGit Branches View 的勾选框） */
+  toggleGraphRef: (fullName: string) => Promise<void>;
   refresh: (opts?: { force?: boolean }) => Promise<void>;
   /** 只刷新提交历史（翻页/搜索/切范围用，不重跑 status/refs/stash 等八条命令） */
   refreshLog: () => Promise<void>;
@@ -377,9 +414,14 @@ interface AppStore {
   mergeBranchOp: (name: string, squash?: boolean) => Promise<void>;
   rebaseOntoOp: (name: string) => Promise<void>;
 
-  stashSaveOp: (message: string) => Promise<void>;
+  stashSaveOp: (message: string, paths?: string[]) => Promise<void>;
   stashApplyOp: (ref: string, drop: boolean) => Promise<void>;
   stashDropOp: (ref: string) => Promise<void>;
+
+  /** 预览并清理未跟踪文件（先 dry-run 列清单，确认后 git clean -fd） */
+  cleanUntrackedOp: () => Promise<void>;
+  /** 读取 HEAD reflog（RefsPanel 的 Reflog 区块） */
+  loadReflog: () => Promise<void>;
 
   createTagOp: (name: string, message: string) => Promise<void>;
   deleteTagOp: (name: string) => Promise<void>;
@@ -401,6 +443,8 @@ const EMPTY_REPO_STATE = {
   graph: [] as GraphRow[],
   stashes: [] as StashEntry[],
   backups: [] as BackupEntry[],
+  excludedRefs: [] as string[],
+  reflog: [] as ReflogEntry[],
   ongoing: null,
   remotes: [] as RemoteInfo[],
   remote: 'origin',
@@ -482,6 +526,39 @@ export const useStore = create<AppStore>()((set, get) => {
     const repo = get().repo;
     if (!repo) throw new Error('没有打开仓库');
     return repo.path;
+  }
+
+  /**
+   * 按当前已知的 refs 裁剪排除列表：被删除的分支不能再作为 --not 参数，
+   * 否则 git log 直接报 unknown revision。
+   */
+  function prunedExcludes(repoPath: string): string[] {
+    const cur = get().excludedRefs;
+    if (cur.length === 0) return [];
+    const known = new Set(get().refs.map((r) => r.fullName));
+    const next = cur.filter((x) => known.has(x));
+    if (next.length !== cur.length) {
+      saveGraphExcludes(repoPath, next);
+      set({ excludedRefs: next });
+    }
+    return next;
+  }
+
+  /** 带排除项取日志；排除项引用失效时清空重试一次（自愈） */
+  async function fetchLogSafe(
+    repoPath: string,
+    limit: number,
+    scope: LogScope,
+    excludes: string[],
+  ): Promise<Commit[]> {
+    try {
+      return await getLog(repoPath, limit, scope, excludes);
+    } catch (e) {
+      if (excludes.length === 0) throw e;
+      saveGraphExcludes(repoPath, []);
+      set({ excludedRefs: [] });
+      return getLog(repoPath, limit, scope, []);
+    }
   }
 
   /** 统一的写操作包装：backup → 执行 → 刷新 → 重载当前 diff */
@@ -715,7 +792,7 @@ export const useStore = create<AppStore>()((set, get) => {
           ...get().recent.filter((r) => r.path !== repo.path),
         ].slice(0, MAX_RECENT);
         saveRecent(recent);
-        set({ repo, recent, bottomPanel: 'none' });
+        set({ repo, recent, bottomPanel: 'none', excludedRefs: loadGraphExcludes(repo.path) });
         await startWatch(repo.path);
         await get().refresh();
         // 刚打开的仓库立刻读一次当前分支（左栏显示 name (branch)）
@@ -759,6 +836,31 @@ export const useStore = create<AppStore>()((set, get) => {
       set({ repoBranches: map });
     },
 
+    /** 勾/取消一个 ref 参与提交图；排除列表按仓库持久化，立即重拉日志 */
+    async toggleGraphRef(fullName) {
+      const repo = get().repo;
+      if (!repo) return;
+      const cur = new Set(get().excludedRefs);
+      if (cur.has(fullName)) cur.delete(fullName);
+      else cur.add(fullName);
+      const list = [...cur];
+      saveGraphExcludes(repo.path, list);
+      set({ excludedRefs: list });
+      await get().refreshLog();
+    },
+
+    /** 读取 HEAD reflog（Reflog 区块展开或手动刷新时调用） */
+    async loadReflog() {
+      const repo = get().repo;
+      if (!repo) return;
+      try {
+        const entries = await getReflog(repo.path);
+        set({ reflog: entries });
+      } catch {
+        /* reflog 读取失败不打扰主流程 */
+      }
+    },
+
     async refresh(opts?: { force?: boolean }) {
       const repo = get().repo;
       if (!repo) return;
@@ -769,12 +871,15 @@ export const useStore = create<AppStore>()((set, get) => {
       set({ busy: '刷新…', error: null });
       try {
         const search = get().logQuery;
+        const searchActive = !!(search && search.text.trim());
+        // 搜索不受图过滤影响（找提交是全库找的）；只有常规日志按勾选裁剪
+        const excludes = searchActive ? [] : await prunedExcludes(repo.path);
         const [status, commits, refs, stashes, backups, ongoing, remotes, stat] = await Promise.all(
           [
             getStatus(repo.path),
-            search && search.text.trim()
+            searchActive
               ? searchLog(repo.path, get().logLimit, search, get().logScope)
-              : getLog(repo.path, get().logLimit, get().logScope),
+              : fetchLogSafe(repo.path, get().logLimit, get().logScope, excludes),
             getRefs(repo.path),
             listStashes(repo.path),
             listBackups(repo.path),
@@ -869,7 +974,12 @@ export const useStore = create<AppStore>()((set, get) => {
         const commits =
           search && search.text.trim()
             ? await searchLog(repo.path, get().logLimit, search, get().logScope)
-            : await getLog(repo.path, get().logLimit, get().logScope);
+            : await fetchLogSafe(
+                repo.path,
+                get().logLimit,
+                get().logScope,
+                prunedExcludes(repo.path),
+              );
 
         const current = get().selectedSha;
         set({ commits, graph: layoutGraph(commits) });
@@ -1551,11 +1661,46 @@ export const useStore = create<AppStore>()((set, get) => {
       });
     },
 
-    async stashSaveOp(message) {
-      await mutate('保存 stash', false, async () => {
-        const res = await saveStash(getRepoPath(), message);
+    async stashSaveOp(message, paths) {
+      const label = paths && paths.length > 0 ? `Stash ${paths.length} 个文件` : '保存 stash';
+      await mutate(label, false, async () => {
+        const res =
+          paths && paths.length > 0
+            ? await saveStashPaths(getRepoPath(), message, paths)
+            : await saveStash(getRepoPath(), message);
         if (res.code !== 0) throw new Error(res.stderr.trim() || 'stash 失败');
       });
+    },
+
+    /** 清理未跟踪文件：先 dry-run 拿清单，确认后执行（SmartGit 式的安全检查） */
+    async cleanUntrackedOp() {
+      const repo = get().repo;
+      if (!repo) return;
+      let paths: string[] = [];
+      try {
+        paths = await cleanPreview(repo.path);
+      } catch (e) {
+        set({ error: errMsg(e) });
+        return;
+      }
+      if (paths.length === 0) {
+        await confirmBox({
+          title: '清理未跟踪文件',
+          body: '工作区里没有未跟踪的文件。',
+          okText: '好',
+        });
+        return;
+      }
+      const shown =
+        paths.slice(0, 20).join('\n') + (paths.length > 20 ? `\n… 共 ${paths.length} 项` : '');
+      const ok = await confirmBox({
+        title: `删除 ${paths.length} 个未跟踪文件/目录？`,
+        body: `${shown}\n\n这些内容会被永久删除（不进回收站），被 .gitignore 忽略的内容不受影响。`,
+        okText: '删除',
+        danger: true,
+      });
+      if (!ok) return;
+      await mutate('清理未跟踪文件', false, () => cleanUntracked(repo.path));
     },
 
     async stashApplyOp(ref, drop) {

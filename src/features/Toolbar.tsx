@@ -117,6 +117,7 @@ export function Toolbar() {
   const mergeBranchOp = useStore((s) => s.mergeBranchOp);
   const rebaseOntoOp = useStore((s) => s.rebaseOntoOp);
   const stashSaveOp = useStore((s) => s.stashSaveOp);
+  const cleanUntrackedOp = useStore((s) => s.cleanUntrackedOp);
   const stashApplyOp = useStore((s) => s.stashApplyOp);
   const stagePicked = useStore((s) => s.stagePicked);
   const unstagePicked = useStore((s) => s.unstagePicked);
@@ -156,6 +157,7 @@ export function Toolbar() {
   const disabled = busy !== null;
   const noRepo = !repo;
   const hasRemote = remotes.length > 0;
+  const untrackedCount = (status?.entries ?? []).filter((e) => e.kind === 'untracked').length;
 
   const newTag = async () => {
     const name = await promptBox({
@@ -180,6 +182,16 @@ export function Toolbar() {
       okText: '保存',
     });
     await stashSaveOp(message ?? '');
+  };
+
+  /** 只 stash 左侧勾选的文件（git stash push -- <paths>），其余改动留在工作区 */
+  const stashPicked = async () => {
+    const message = await promptBox({
+      title: `Stash ${pickedWorktree.length} 个文件`,
+      label: '说明（可选）。只有勾选的文件进 stash，其余改动保留在工作区',
+      okText: '保存',
+    });
+    await stashSaveOp(message ?? '', pickedWorktree);
   };
 
   return (
@@ -298,12 +310,29 @@ export function Toolbar() {
       <span className="tb-sep" />
 
       <Popover
-        width={190}
+        width={230}
         trigger={<TB icon={IconStash} label="Stash" caret disabled={disabled || noRepo} />}
       >
         <MenuItem onClick={() => void newStash()} disabled={counts.total === 0}>
           保存 Stash
         </MenuItem>
+        <MenuItem
+          onClick={() => void stashPicked()}
+          disabled={pickedWorktree.length === 0}
+          hint={pickedWorktree.length > 0 ? `${pickedWorktree.length} 个文件` : undefined}
+          title="只 stash 左侧勾选的文件，其余改动留在工作区"
+        >
+          Stash 勾选的文件
+        </MenuItem>
+        <MenuItem
+          onClick={() => void cleanUntrackedOp()}
+          disabled={untrackedCount === 0}
+          hint={untrackedCount > 0 ? `${untrackedCount} 个` : undefined}
+          title="先列出将删除的未跟踪文件，确认后 git clean -fd"
+        >
+          清理未跟踪文件…
+        </MenuItem>
+        <MenuSep />
         <MenuItem
           onClick={() => void stashApplyOp(stashes[0].ref, true)}
           disabled={stashes.length === 0}

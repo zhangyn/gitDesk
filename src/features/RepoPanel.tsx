@@ -1,10 +1,31 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { IconFolder } from '../ui/icons';
+
+const FAV_KEY = 'gitdesk.favorites';
+
+function loadFavorites(): string[] {
+  try {
+    const arr = JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]') as unknown;
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((x): x is string => typeof x === 'string');
+  } catch {
+    return [];
+  }
+}
+
+function saveFavorites(list: string[]): void {
+  try {
+    localStorage.setItem(FAV_KEY, JSON.stringify(list));
+  } catch {
+    /* 忽略配额错误 */
+  }
+}
 
 /**
  * 左栏顶部的仓库列表（对标 SmartGit 的 Repositories 面板）。
  * 每个仓库显示 `name (branch)`，点一下即切换 —— 多项目不用每次走「打开仓库」。
+ * 收藏的仓库置顶显示（☆/★ 切换，按路径持久化）。
  */
 export function RepoPanel() {
   const repo = useStore((s) => s.repo);
@@ -17,6 +38,21 @@ export function RepoPanel() {
   const busy = useStore((s) => s.busy);
 
   const [open, setOpen] = useState(true);
+  const [favs, setFavs] = useState<string[]>(loadFavorites);
+
+  const toggleFav = (path: string) => {
+    const next = favs.includes(path) ? favs.filter((p) => p !== path) : [...favs, path];
+    setFavs(next);
+    saveFavorites(next);
+  };
+
+  // 收藏置顶，其余按最近打开顺序（sort 稳定，组内顺序不变）
+  const sorted = useMemo(
+    () =>
+      [...recent].sort((a, b) => (favs.includes(b.path) ? 1 : 0) - (favs.includes(a.path) ? 1 : 0)),
+    [recent, favs],
+  );
+
   return (
     <div className="repo-panel">
       <div className="section-bar">
@@ -35,12 +71,13 @@ export function RepoPanel() {
       {open && (
         <div className="repo-list">
           {recent.length === 0 && <div className="empty-hint small">还没有打开过仓库</div>}
-          {recent.map((r) => {
+          {sorted.map((r) => {
             const active = r.path === repo?.path;
+            const fav = favs.includes(r.path);
             return (
               <div
                 key={r.path}
-                className={`repo-item${active ? ' is-current' : ''}`}
+                className={`repo-item${active ? ' is-current' : ''}${fav ? ' is-fav' : ''}`}
                 title={r.path}
               >
                 <button
@@ -56,6 +93,13 @@ export function RepoPanel() {
                   )}
                 </button>
                 <span className="row-actions">
+                  <button
+                    className="icon-btn"
+                    title={fav ? '取消收藏' : '收藏（置顶显示）'}
+                    onClick={() => toggleFav(r.path)}
+                  >
+                    {fav ? '★' : '☆'}
+                  </button>
                   <button
                     className="icon-btn danger"
                     title="从列表移除"

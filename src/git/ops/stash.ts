@@ -35,6 +35,19 @@ export async function saveStash(repoPath: string, message: string) {
   return runGit(args, { cwd: repoPath, timeoutMs: 120_000 });
 }
 
+/** 只 stash 指定的文件（git stash push -- <paths>），其余改动留在工作区 */
+export async function saveStashPaths(repoPath: string, message: string, paths: string[]) {
+  if (paths.length === 0)
+    return runGit(['stash', 'push', '--include-untracked'], {
+      cwd: repoPath,
+      timeoutMs: 120_000,
+    });
+  const args = ['stash', 'push', '--include-untracked'];
+  if (message.trim()) args.push('-m', message.trim());
+  args.push('--', ...paths);
+  return runGit(args, { cwd: repoPath, timeoutMs: 120_000 });
+}
+
 export async function applyStash(repoPath: string, ref: string, drop: boolean) {
   return runGit(['stash', drop ? 'pop' : 'apply', ref], { cwd: repoPath, timeoutMs: 120_000 });
 }
