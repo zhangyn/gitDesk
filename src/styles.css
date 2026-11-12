@@ -3195,3 +3195,18 @@ body.is-resizing-x {
   font-size: 11.5px;
   color: var(--muted);
 }
+
+/* ==================== v10：SmartGit 式布局（图在上，文件|diff 在下） ==================== */
+
+/* 下部一行：左「变更」右「差异」，中间水平分隔条 */
+.bottom-split {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 水平分隔条：列方向的调整 */
+.splitter.hsplit {
+  cursor: col-resize;
+}
