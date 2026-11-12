@@ -1,5 +1,6 @@
 import type { Commit, CommitFile } from '../../types';
 import { parseLog } from '../../parse/log';
+import { parseNameStatus } from '../nameStatus';
 import { runGit, runGitChecked } from '../runner';
 
 /** %x1f 分隔字段，%x1e 分隔记录 —— 与 parse/log.ts 一一对应 */
@@ -93,22 +94,32 @@ export async function getReflog(repoPath: string, limit = 40): Promise<ReflogEnt
 
 /**
  * 某个提交改了哪些文件。
- * 用 --no-renames 把重命名拆成 A+D，避免 -z 下三段式 token 的解析复杂度。
+ * merge 提交不能用 git show：它只输出 combined diff（只有相对**所有**父提交都
+ * 改过内容的文件才出现，普通合并为空——表现为"没有文件改动"）。
+ * 所以一律优先和第一父提交做树对比（git diff <sha>^1 <sha>），这是 GUI 客户端的
+ * 标准语义（"这次提交往主线里带进了什么"）；根提交没有 ^1 时退回 git show。
+ * --no-renames 把重命名拆成 A+D，避免 -z 下三段式 token 的解析复杂度。
  */
 export async function getCommitFiles(repoPath: string, sha: string): Promise<CommitFile[]> {
-  const res = await runGitChecked(
-    ['show', '--name-status', '--format=', '-z', '--no-renames', sha],
-    { cwd: repoPath, quiet: true, timeoutMs: 20_000 },
-  );
-  const tokens = res.stdout.split('\0').filter((t) => t.length > 0);
-  const files: CommitFile[] = [];
-  for (let i = 0; i + 1 < tokens.length; i += 2) {
-    const status = tokens[i];
-    const path = tokens[i + 1];
-    if (!status || !path) break;
-    files.push({ path, status: status[0] });
+  let res = await runGit(['diff', '--name-status', '-z', '--no-renames', `${sha}^1`, sha], {
+    cwd: repoPath,
+    quiet: true,
+    timeoutMs: 30_000,
+  });
+  if (res.code !== 0) {
+    // 多半是根提交（没有 ^1），退回 show
+    res = await runGit(['show', '--name-status', '--format=', '-z', '--no-renames', sha], {
+      cwd: repoPath,
+      quiet: true,
+      timeoutMs: 20_000,
+    });
   }
-  return files;
+  if (res.code !== 0) {
+    throw new Error(
+      res.stderr.trim() || res.stdout.trim() || `读取提交 ${sha.slice(0, 7)} 的文件列表失败`,
+    );
+  }
+  return parseNameStatus(res.stdout);
 }
 
 export async function getCommitBody(repoPath: string, sha: string): Promise<string> {

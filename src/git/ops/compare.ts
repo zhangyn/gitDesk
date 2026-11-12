@@ -1,5 +1,6 @@
 import type { CommitFile, FilePatch } from '../../types';
 import { parsePatches } from '../../parse/diff';
+import { parseNameStatus } from '../nameStatus';
 import { diffViewArgs } from './diff';
 import { runGit, runGitChecked } from '../runner';
 
@@ -45,14 +46,7 @@ export async function compareFiles(repoPath: string, a: string, b: string): Prom
     }),
   ]);
 
-  const tokens = nameStatus.stdout.split('\0').filter((t) => t.length > 0);
-  const files: CommitFile[] = [];
-  for (let i = 0; i + 1 < tokens.length; i += 2) {
-    const status = tokens[i];
-    const path = tokens[i + 1];
-    if (!status || !path) break;
-    files.push({ path, status: status[0] });
-  }
+  const files = parseNameStatus(nameStatus.stdout);
 
   return {
     files,

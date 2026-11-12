@@ -40,6 +40,10 @@ export default function App() {
   const continueOp = useStore((s) => s.continueOp);
   const skipOp = useStore((s) => s.skipOp);
   const abortOp = useStore((s) => s.abortOp);
+  const bisecting = useStore((s) => s.bisecting);
+  const bisectInfo = useStore((s) => s.bisectInfo);
+  const bisectMarkOp = useStore((s) => s.bisectMarkOp);
+  const bisectResetOp = useStore((s) => s.bisectResetOp);
 
   const [leftW, setLeftW] = useState(loadLeftWidth);
   const hostRef = useRef<HTMLElement | null>(null);
@@ -138,6 +142,50 @@ export default function App() {
               )}
               <button className="btn small danger" onClick={() => void abortOp()}>
                 中止
+              </button>
+            </div>
+          )}
+
+          {bisecting && (
+            <div className="ongoing-banner bisect-banner">
+              <span className="ob-title">进行中：二分查找（bisect）</span>
+              <span className="ob-sub" title={bisectInfo ?? undefined}>
+                {bisectInfo
+                  ? bisectInfo
+                  : '先在提交详情里点「好标记」确定范围，然后测试当前检出的代码并标记'}
+              </span>
+              <span className="spacer" />
+              <button
+                className="btn small primary"
+                disabled={busy !== null}
+                title="git bisect good：当前检出的提交表现正常"
+                onClick={() => void bisectMarkOp('good')}
+              >
+                当前是好的
+              </button>
+              <button
+                className="btn small danger"
+                disabled={busy !== null}
+                title="git bisect bad：当前检出的提交有问题"
+                onClick={() => void bisectMarkOp('bad')}
+              >
+                当前是坏的
+              </button>
+              <button
+                className="btn small"
+                disabled={busy !== null}
+                title="git bisect skip：这个提交测不了，跳过它"
+                onClick={() => void bisectMarkOp('skip')}
+              >
+                跳过
+              </button>
+              <button
+                className="btn small"
+                disabled={busy !== null}
+                title="git bisect reset：结束二分并回到原分支"
+                onClick={() => void bisectResetOp()}
+              >
+                结束
               </button>
             </div>
           )}

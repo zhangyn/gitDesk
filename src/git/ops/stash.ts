@@ -1,5 +1,6 @@
 import type { CommitFile, FilePatch } from '../../types';
 import { parsePatches } from '../../parse/diff';
+import { parseNameStatus } from '../nameStatus';
 import { diffViewArgs } from './diff';
 import { runGit } from '../runner';
 
@@ -64,15 +65,7 @@ export async function stashFiles(repoPath: string, ref: string): Promise<CommitF
     timeoutMs: 30_000,
   });
   if (res.code !== 0) return [];
-  const tokens = res.stdout.split('\0').filter((t) => t.length > 0);
-  const files: CommitFile[] = [];
-  for (let i = 0; i + 1 < tokens.length; i += 2) {
-    const status = tokens[i];
-    const path = tokens[i + 1];
-    if (!status || !path) break;
-    files.push({ path, status: status[0] });
-  }
-  return files;
+  return parseNameStatus(res.stdout);
 }
 
 /** stash 里单个文件的 diff */

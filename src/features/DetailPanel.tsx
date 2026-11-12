@@ -146,6 +146,9 @@ export function DetailPanel() {
   const cherryPickOp = useStore((s) => s.cherryPickOp);
   const revertOp = useStore((s) => s.revertOp);
   const undoLastCommitOp = useStore((s) => s.undoLastCommitOp);
+  const bisecting = useStore((s) => s.bisecting);
+  const bisectStartOp = useStore((s) => s.bisectStartOp);
+  const bisectMarkOp = useStore((s) => s.bisectMarkOp);
   const wordWrap = useStore((s) => s.diffFlags.wordWrap);
 
   const hunkCount = useMemo(() => patches.reduce((n, p) => n + p.hunks.length, 0), [patches]);
@@ -275,6 +278,32 @@ export function DetailPanel() {
               >
                 撤销提交
               </button>
+            )}
+            {!bisecting ? (
+              <button
+                className="btn small"
+                title={`以 ${commit.sha.slice(0, 7)} 为坏提交开始二分查找（git bisect start）`}
+                onClick={() => void bisectStartOp(commit.sha)}
+              >
+                二分
+              </button>
+            ) : (
+              <>
+                <button
+                  className="btn small primary"
+                  title={`git bisect good ${commit.sha.slice(0, 7)}：标记这个提交是好的`}
+                  onClick={() => void bisectMarkOp('good', commit.sha)}
+                >
+                  好标记
+                </button>
+                <button
+                  className="btn small danger"
+                  title={`git bisect bad ${commit.sha.slice(0, 7)}：标记这个提交是坏的`}
+                  onClick={() => void bisectMarkOp('bad', commit.sha)}
+                >
+                  坏标记
+                </button>
+              </>
             )}
             <HunkNav count={hunkCount} index={nav.index} onGo={nav.go} />
             <WordToggle />

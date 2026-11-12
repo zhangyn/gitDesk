@@ -30,16 +30,26 @@ export function diffViewArgs(): string[] {
   return args;
 }
 
-/** 提交内单个文件的 diff（对根提交也成立） */
+/**
+ * 提交内单个文件的 diff（对根提交也成立）。
+ * merge 提交的 git show 只输出 combined diff（大多为空），所以优先和
+ * 第一父提交对比（git diff <sha>^1 <sha>），根提交没有 ^1 时退回 git show。
+ */
 export async function getCommitDiff(
   repoPath: string,
   sha: string,
   path: string,
 ): Promise<FilePatch[]> {
-  const res = await runGit(
-    ['show', '--format=', '--no-color', '--no-ext-diff', '-U3', sha, '--', path],
+  let res = await runGit(
+    ['diff', '--no-color', '--no-ext-diff', '-U3', ...diffViewArgs(), `${sha}^1`, sha, '--', path],
     { cwd: repoPath, timeoutMs: 60_000 },
   );
+  if (res.code !== 0) {
+    res = await runGit(
+      ['show', '--format=', '--no-color', '--no-ext-diff', '-U3', sha, '--', path],
+      { cwd: repoPath, timeoutMs: 60_000 },
+    );
+  }
   return parsePatches(res.stdout);
 }
 

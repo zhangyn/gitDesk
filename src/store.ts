@@ -52,6 +52,13 @@ import {
   unstagePaths,
 } from './git/ops/indexOps';
 import {
+  bisectMark,
+  bisectReset,
+  bisectStart,
+  isBisecting,
+  type BisectTerm,
+} from './git/ops/bisect';
+import {
   createCommit,
   getLastCommitMessage,
   getRecentCommitMessages,
@@ -203,6 +210,12 @@ function errMsg(e: unknown): string {
   return String(e);
 }
 
+/** bisect 的命令输出往往很长（含完整提交信息），横幅上只放一小段 */
+function capBisectInfo(s: string, max = 400): string {
+  const t = s.trim();
+  return t.length > max ? `${t.slice(0, max)}…` : t;
+}
+
 function loadRecent(): RepoEntry[] {
   try {
     const raw = localStorage.getItem(RECENT_KEY);
@@ -283,6 +296,10 @@ interface AppStore {
   excludedRefs: string[];
   /** HEAD 移动记录（Reflog 面板，展开区块时懒加载） */
   reflog: ReflogEntry[];
+  /** 正在进行 git bisect（决定横幅和提交头的标记按钮） */
+  bisecting: boolean;
+  /** bisect 最近一次输出的状态信息（"Bisecting: N revisions left…" / 首个坏提交） */
+  bisectInfo: string | null;
   ongoing: string | null;
   remotes: RemoteInfo[];
   remote: string;
@@ -398,6 +415,12 @@ interface AppStore {
   revertOp: (sha: string) => Promise<void>;
   /** 撤销最后一次提交（reset --soft：改动回到暂存区） */
   undoLastCommitOp: (sha: string) => Promise<void>;
+  /** 以指定提交为「坏」开始二分查找 */
+  bisectStartOp: (badSha: string) => Promise<void>;
+  /** bisect 标记：不带 rev = 当前检出；带 rev = 标记历史提交 */
+  bisectMarkOp: (term: BisectTerm, rev?: string) => Promise<void>;
+  /** 结束二分并回到原分支 */
+  bisectResetOp: () => Promise<void>;
   continueOp: () => Promise<void>;
   skipOp: () => Promise<void>;
   abortOp: () => Promise<void>;
@@ -445,6 +468,8 @@ const EMPTY_REPO_STATE = {
   backups: [] as BackupEntry[],
   excludedRefs: [] as string[],
   reflog: [] as ReflogEntry[],
+  bisecting: false,
+  bisectInfo: null as string | null,
   ongoing: null,
   remotes: [] as RemoteInfo[],
   remote: 'origin',
@@ -874,8 +899,8 @@ export const useStore = create<AppStore>()((set, get) => {
         const searchActive = !!(search && search.text.trim());
         // 搜索不受图过滤影响（找提交是全库找的）；只有常规日志按勾选裁剪
         const excludes = searchActive ? [] : await prunedExcludes(repo.path);
-        const [status, commits, refs, stashes, backups, ongoing, remotes, stat] = await Promise.all(
-          [
+        const [status, commits, refs, stashes, backups, ongoing, remotes, stat, bisecting] =
+          await Promise.all([
             getStatus(repo.path),
             searchActive
               ? searchLog(repo.path, get().logLimit, search, get().logScope)
@@ -890,8 +915,8 @@ export const useStore = create<AppStore>()((set, get) => {
               quiet: true,
               timeoutMs: 30_000,
             }),
-          ],
-        );
+            isBisecting(repo.path),
+          ]);
         const statText = stat.stdout.trim();
         const statFiles = /(\d+) file/.exec(statText);
         const statIns = /(\d+) insertion/.exec(statText);
@@ -918,7 +943,10 @@ export const useStore = create<AppStore>()((set, get) => {
           remotes,
           remote,
           graph: layoutGraph(commits),
+          // 二分结束后清掉横幅上的状态信息
+          ...(bisecting ? {} : { bisectInfo: null }),
         });
+        set({ bisecting });
 
         const current = get().selectedSha;
         if (!current || !commits.some((c) => c.sha === current)) {
@@ -1494,6 +1522,48 @@ export const useStore = create<AppStore>()((set, get) => {
         if (res.code !== 0) {
           throw new Error(res.stderr.trim() || '撤销失败（根提交或历史不连续时无法撤销）');
         }
+      });
+    },
+
+    /** 以选中提交为「坏」开始二分查找 */
+    async bisectStartOp(badSha) {
+      const ok = await confirmBox({
+        title: `开始二分查找（坏提交 = ${badSha.slice(0, 7)}）？`,
+        body:
+          '接下来：① 在一个已知「好」的提交上点「好标记」确定范围；' +
+          '② git 自动检出中间提交，你测试后用横幅上的「当前是好的/坏的」逐步缩小；' +
+          '③ 找到第一个坏提交后点「结束」回到原分支。',
+        okText: '开始',
+      });
+      if (!ok) return;
+      await mutate('开始二分查找', false, async () => {
+        const res = await bisectStart(getRepoPath(), badSha);
+        if (res.code !== 0) {
+          throw new Error(res.stderr.trim() || 'git bisect start 失败（工作区不干净时会被拒绝）');
+        }
+        set({ bisectInfo: capBisectInfo(res.stdout) });
+      });
+    },
+
+    /** bisect 标记：不带 rev 标记当前检出，带 rev 标记历史提交 */
+    async bisectMarkOp(term, rev) {
+      await mutate(`bisect ${term}`, false, async () => {
+        const res = await bisectMark(getRepoPath(), term, rev);
+        if (res.code !== 0) {
+          throw new Error(res.stderr.trim() || `git bisect ${term} 失败`);
+        }
+        set({ bisectInfo: capBisectInfo(res.stdout) });
+      });
+    },
+
+    /** 结束二分并回到原分支 */
+    async bisectResetOp() {
+      await mutate('结束二分', false, async () => {
+        const res = await bisectReset(getRepoPath());
+        if (res.code !== 0) {
+          throw new Error(res.stderr.trim() || 'git bisect reset 失败');
+        }
+        set({ bisectInfo: null });
       });
     },
 
