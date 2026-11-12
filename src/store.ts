@@ -17,6 +17,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import {
   beginWriteWindow,
   endWriteWindow,
+  isWriteInFlight,
   probeGit,
   runGit,
   setOneShotAuth,
@@ -761,8 +762,10 @@ export const useStore = create<AppStore>()((set, get) => {
     async refresh(opts?: { force?: boolean }) {
       const repo = get().repo;
       if (!repo) return;
-      // 有操作正在进行时，文件监听/手动触发的刷新直接让路（mutate 内部的 reload 用 force 穿透）
-      if (get().busy && !opts?.force) return;
+      // 写操作进行期间，文件监听/手动触发的刷新直接让路。
+      // 注意判断依据是写窗口计数而不是 busy 字符串——初次加载（busy=打开仓库…）
+      // 和操作内部的刷新必须照常执行，只有 mutate 内部的 reload 用 force 穿透。
+      if (!opts?.force && isWriteInFlight()) return;
       set({ busy: '刷新…', error: null });
       try {
         const search = get().logQuery;
@@ -859,6 +862,7 @@ export const useStore = create<AppStore>()((set, get) => {
     async refreshLog() {
       const repo = get().repo;
       if (!repo) return;
+      if (isWriteInFlight()) return;
       set({ busy: '刷新…', error: null });
       try {
         const search = get().logQuery;
@@ -1337,7 +1341,7 @@ export const useStore = create<AppStore>()((set, get) => {
         if (res.code !== 0) {
           const msg = res.stderr.trim() || res.stdout.trim();
           if (/conflict/i.test(msg)) {
-            await get().refresh();
+            await get().refresh({ force: true });
             throw new Error(`${msg}\n\n有冲突，请在「变更」里解决后点顶部的「继续」。`);
           }
           throw new Error(msg || '拣选失败');
@@ -1358,7 +1362,7 @@ export const useStore = create<AppStore>()((set, get) => {
         if (res.code !== 0) {
           const msg = res.stderr.trim() || res.stdout.trim();
           if (/conflict/i.test(msg)) {
-            await get().refresh();
+            await get().refresh({ force: true });
             throw new Error(`${msg}\n\n有冲突，请在「变更」里解决后点顶部的「继续」。`);
           }
           throw new Error(msg || '还原失败');
@@ -1457,7 +1461,7 @@ export const useStore = create<AppStore>()((set, get) => {
           return false;
         }
         set({ bottomPanel: 'none' });
-        await get().refresh();
+        await get().refresh({ force: true });
         return true;
       } catch (e) {
         set({ error: errMsg(e) });
@@ -1514,7 +1518,7 @@ export const useStore = create<AppStore>()((set, get) => {
           const msg = res.stderr.trim() || res.stdout.trim();
           // 冲突不算失败，提示去解决
           if (/conflict/i.test(msg)) {
-            await get().refresh();
+            await get().refresh({ force: true });
             throw new Error(`${msg}\n\n有冲突，请在「变更」里逐个解决。`);
           }
           throw new Error(msg || '合并失败');
@@ -1539,7 +1543,7 @@ export const useStore = create<AppStore>()((set, get) => {
         if (res.code !== 0) {
           const msg = res.stderr.trim() || res.stdout.trim();
           if (/conflict/i.test(msg)) {
-            await get().refresh();
+            await get().refresh({ force: true });
             throw new Error(`${msg}\n\n有冲突，解决后需要手动执行 git rebase --continue。`);
           }
           throw new Error(msg || '变基失败');

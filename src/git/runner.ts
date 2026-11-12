@@ -32,6 +32,11 @@ export function watcherSuppressed(): boolean {
   return writeDepth > 0 || Date.now() < suppressUntil;
 }
 
+/** 是否有写操作正在进行（mutate/commit/fetch/pull/push 的整个生命周期） */
+export function isWriteInFlight(): boolean {
+  return writeDepth > 0;
+}
+
 /**
  * 写操作（add/commit/checkout…）开始前调用：整个执行期间文件监听保持安静，
  * 结束后由 endWriteWindow 恢复。用计数器支持嵌套（mutate 里还可能调 createBackup）。
