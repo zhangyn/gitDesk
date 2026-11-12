@@ -204,6 +204,18 @@ function loadDiffFlags(): DiffFlags {
   return { ignoreWhitespace: false, ignoreEol: false, wordWrap: false };
 }
 
+/* ------------------------------------------------------- 中区面板布局 */
+
+/** 三种可选布局（工具栏「更多」菜单切换） */
+export type CenterLayout = 'graph-top' | 'graph-bottom' | 'stacked';
+
+const CENTER_LAYOUT_KEY = 'gitdesk.centerLayout';
+
+export function loadCenterLayout(): CenterLayout {
+  const v = localStorage.getItem(CENTER_LAYOUT_KEY);
+  return v === 'graph-top' || v === 'graph-bottom' || v === 'stacked' ? v : 'graph-top';
+}
+
 function errMsg(e: unknown): string {
   if (e instanceof Error) return e.message;
   if (typeof e === 'string') return e;
@@ -348,6 +360,9 @@ interface AppStore {
   /** 双击文件打开的大窗 diff */
   diffModal: boolean;
   theme: Theme;
+  /** 中区面板布局：图在上 / 图在下 / 经典三行（工具栏「更多」菜单切换） */
+  centerLayout: CenterLayout;
+  setCenterLayout: (l: CenterLayout) => void;
 
   target: DiffTarget | null;
   worktreePatches: FilePatch[];
@@ -767,6 +782,16 @@ export const useStore = create<AppStore>()((set, get) => {
     ...EMPTY_REPO_STATE,
     bottomPanel: 'none',
     theme: loadTheme(),
+    centerLayout: loadCenterLayout(),
+
+    setCenterLayout(l) {
+      set({ centerLayout: l });
+      try {
+        localStorage.setItem(CENTER_LAYOUT_KEY, l);
+      } catch {
+        /* 忽略配额错误 */
+      }
+    },
 
     async boot() {
       if (get().booted) return;

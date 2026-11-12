@@ -10,6 +10,7 @@ function Section({
   defaultOpen = true,
   dense,
   onOpen,
+  tip,
 }: {
   title: string;
   count?: number;
@@ -19,6 +20,8 @@ function Section({
   dense?: boolean;
   /** 区块展开时回调（懒加载数据用，例如 Reflog） */
   onOpen?: () => void;
+  /** 悬停区块标题时的说明（不用猜勾选框是干嘛的） */
+  tip?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   // 数据是异步来的：首次渲染时 count 还是 0，所以 defaultOpen 可能是 false。
@@ -36,6 +39,7 @@ function Section({
       <div className="section-bar">
         <button
           className="section-head"
+          title={tip}
           onClick={() => {
             setOpen((v) => {
               if (!v) onOpen?.();
@@ -165,6 +169,7 @@ export function RefsPanel() {
       )}
       <Section
         title="本地分支"
+        tip="勾选框控制该分支是否参与上方的提交图：取消勾选即从图中收起这条开发线（当前分支始终显示）。双击分支切换检出。"
         count={branches.length}
         action={
           <button className="icon-btn" title="新建分支" onClick={() => void newBranch()}>
@@ -224,7 +229,12 @@ export function RefsPanel() {
         })}
       </Section>
 
-      <Section title="远程分支" count={remotes.length} defaultOpen={false}>
+      <Section
+        title="远程分支"
+        tip="勾选框控制该远程分支是否参与提交图。双击检出为本地分支。"
+        count={remotes.length}
+        defaultOpen={false}
+      >
         {remotes.length === 0 && <div className="empty-hint small">无</div>}
         {remotes.map((r) => (
           <div

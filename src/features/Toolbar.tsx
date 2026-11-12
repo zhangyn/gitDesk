@@ -8,7 +8,6 @@ import { CompareDialog } from './CompareDialog';
 import {
   IconAuto,
   IconBranch,
-  IconCompare,
   IconMoon,
   IconSun,
   IconChevron,
@@ -22,7 +21,6 @@ import {
   IconRefresh,
   IconStage,
   IconStash,
-  IconTag,
   IconUnstage,
 } from '../ui/icons';
 
@@ -144,6 +142,8 @@ export function Toolbar() {
   const createTagOp = useStore((s) => s.createTagOp);
   const logScope = useStore((s) => s.logScope);
   const setLogScope = useStore((s) => s.setLogScope);
+  const centerLayout = useStore((s) => s.centerLayout);
+  const setCenterLayout = useStore((s) => s.setCenterLayout);
   const theme = useStore((s) => s.theme);
   const setTheme = useStore((s) => s.setTheme);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -342,19 +342,10 @@ export function Toolbar() {
         </MenuItem>
       </Popover>
 
-      <TB icon={IconTag} label="标签" disabled={disabled || noRepo} onClick={() => void newTag()} />
-      <TB
-        icon={IconCompare}
-        label="对比"
-        disabled={disabled || noRepo}
-        onClick={() => setCompareOpen(true)}
-        title="对比两个分支/提交"
-      />
-
-      <Popover
-        width={230}
-        trigger={<TB icon={IconLog} label="历史" caret disabled={disabled || noRepo} />}
-      >
+      <Popover width={260} trigger={<TB label="更多" caret disabled={noRepo} />}>
+        <MenuItem onClick={() => void newTag()}>新建标签…</MenuItem>
+        <MenuItem onClick={() => setCompareOpen(true)}>对比两个版本…</MenuItem>
+        <MenuSep />
         <div className="menu-title">提交历史范围</div>
         <MenuItem
           onClick={() => setLogScope('local')}
@@ -364,6 +355,26 @@ export function Toolbar() {
         </MenuItem>
         <MenuItem onClick={() => setLogScope('all')} hint={logScope === 'all' ? '当前' : undefined}>
           全部（含远程分支）
+        </MenuItem>
+        <MenuSep />
+        <div className="menu-title">中区面板布局</div>
+        <MenuItem
+          onClick={() => setCenterLayout('graph-top')}
+          hint={centerLayout === 'graph-top' ? '当前' : undefined}
+        >
+          提交图在上（图 + 文件｜差异）
+        </MenuItem>
+        <MenuItem
+          onClick={() => setCenterLayout('graph-bottom')}
+          hint={centerLayout === 'graph-bottom' ? '当前' : undefined}
+        >
+          提交图在下（文件｜差异 + 图）
+        </MenuItem>
+        <MenuItem
+          onClick={() => setCenterLayout('stacked')}
+          hint={centerLayout === 'stacked' ? '当前' : undefined}
+        >
+          经典三行（文件 / 差异 / 图）
         </MenuItem>
       </Popover>
 
