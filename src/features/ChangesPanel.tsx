@@ -6,7 +6,7 @@ import type { CommitFile, StatusEntry } from '../types';
 
 type Tone = 'add' | 'mod' | 'del' | 'rename' | 'conflict' | 'untracked' | 'none';
 
-function toneOf(letter: string, entry: StatusEntry): Tone {
+export function toneOf(letter: string, entry: StatusEntry): Tone {
   if (entry.kind === 'untracked') return 'untracked';
   if (entry.kind === 'unmerged' || letter === 'U') return 'conflict';
   if (letter === 'A') return 'add';
@@ -16,7 +16,7 @@ function toneOf(letter: string, entry: StatusEntry): Tone {
   return 'none';
 }
 
-function Chip({ letter, tone }: { letter: string; tone: Tone }) {
+export function Chip({ letter, tone }: { letter: string; tone: Tone }) {
   // 空格子也画一个淡点：两列宽度恒定，暂存/取消暂存时文件名不会左右跳
   if (letter === '.' || letter === ' ') return <span className="chip chip-empty">·</span>;
   return <span className={`chip chip-${tone}`}>{letter}</span>;
@@ -33,7 +33,7 @@ function describeEntry(entry: StatusEntry): string {
   return '未暂存：改动还在工作区';
 }
 
-function splitPath(path: string): { dir: string; base: string } {
+export function splitPath(path: string): { dir: string; base: string } {
   const idx = path.lastIndexOf('/');
   if (idx < 0) return { dir: '', base: path };
   return { dir: path.slice(0, idx + 1), base: path.slice(idx + 1) };

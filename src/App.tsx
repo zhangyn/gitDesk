@@ -4,7 +4,7 @@ import { Toolbar } from './features/Toolbar';
 import { SidePanel } from './features/SidePanel';
 import { ProjectList } from './features/ProjectList';
 import { CenterStack } from './features/CenterStack';
-import { CommitPanel } from './features/CommitPanel';
+import { CommitDialog } from './features/CommitDialog';
 import { CommandLog } from './features/CommandLog';
 import { DiffModal } from './features/DiffModal';
 import { CredentialDialog } from './features/CredentialDialog';
@@ -205,7 +205,7 @@ export default function App() {
             <CenterStack />
           </main>
 
-          {bottomPanel === 'commit' && <CommitPanel />}
+          {bottomPanel === 'commit' && <CommitDialog />}
           {bottomPanel === 'log' && <CommandLog />}
         </>
       ) : (

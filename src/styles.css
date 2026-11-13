@@ -3231,3 +3231,85 @@ body.is-resizing-x {
 .repo-item.is-fav .repo-item-name {
   color: var(--accent);
 }
+
+/* ==================== v12：提交弹窗 ==================== */
+
+/* 提交弹窗：比普通确认框宽，放得下文件列表和提交信息 */
+.modal.commit-dialog {
+  width: min(640px, calc(100vw - 48px));
+}
+
+.cd-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.cd-head .modal-title {
+  margin-bottom: 0;
+}
+
+/* 暂存文件列表：这次提交带哪些东西，一眼看清 */
+.cd-files {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bg);
+}
+
+.cd-files-title {
+  padding: 5px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel);
+}
+
+.cd-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+
+.cd-file:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cd-path {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cd-hint {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.cd-empty {
+  padding: 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.cd-opts {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+/* 弹窗里的提交信息框：去掉底部面板的边距，占满宽度 */
+.commit-dialog .commit-msg {
+  margin: 10px 0 0;
+  min-height: 96px;
+}
