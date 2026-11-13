@@ -6,6 +6,7 @@ import { DiffActions } from './DiffActions';
 import { ConflictEditor } from './ConflictEditor';
 import { IconSplit, IconUnified } from '../ui/icons';
 import { HunkNav, useHunkNav } from '../ui/HunkNav';
+import { MenuItem, MenuSep, Popover } from '../ui/Popover';
 import { copyText } from '../ui/clipboard';
 
 const MODE_KEY = 'gitdesk.diffMode';
@@ -149,6 +150,7 @@ export function DetailPanel() {
   const bisecting = useStore((s) => s.bisecting);
   const bisectStartOp = useStore((s) => s.bisectStartOp);
   const bisectMarkOp = useStore((s) => s.bisectMarkOp);
+  const resetToOp = useStore((s) => s.resetToOp);
   const wordWrap = useStore((s) => s.diffFlags.wordWrap);
 
   const hunkCount = useMemo(() => patches.reduce((n, p) => n + p.hunks.length, 0), [patches]);
@@ -269,6 +271,26 @@ export function DetailPanel() {
             >
               还原
             </button>
+            {/* 把当前分支重置到这个提交：SmartGit 的 Reset HEAD to，三档模式 */}
+            <Popover
+              width={280}
+              trigger={
+                <button className="btn small" title={`把当前分支重置到 ${commit.sha.slice(0, 7)}`}>
+                  重置 ▾
+                </button>
+              }
+            >
+              <MenuItem onClick={() => void resetToOp(commit.sha, 'soft')}>
+                软重置（--soft）—— 改动保留在暂存区
+              </MenuItem>
+              <MenuItem onClick={() => void resetToOp(commit.sha, 'mixed')}>
+                混合重置（--mixed）—— 改动回到工作区
+              </MenuItem>
+              <MenuSep />
+              <MenuItem danger onClick={() => void resetToOp(commit.sha, 'hard')}>
+                硬重置（--hard）—— 丢弃之后的提交和未提交改动
+              </MenuItem>
+            </Popover>
             {/* 只对当前 HEAD 的提交提供撤销：reset --soft 会改写历史位置 */}
             {commit.sha !== null && commit.sha === status?.branch.oid && (
               <button

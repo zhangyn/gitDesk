@@ -78,10 +78,12 @@ import {
   rebaseContinue,
   rebaseOnto,
   rebaseSkip,
+  resetTo,
   revertAbort,
   revertCommit,
   revertContinue,
   switchBranch,
+  type ResetMode,
 } from './git/ops/branch';
 import {
   applyStash,
@@ -432,6 +434,8 @@ interface AppStore {
   undoLastCommitOp: (sha: string) => Promise<void>;
   /** 以指定提交为「坏」开始二分查找 */
   bisectStartOp: (badSha: string) => Promise<void>;
+  /** 把当前分支重置到指定提交（soft/mixed/hard） */
+  resetToOp: (sha: string, mode: ResetMode) => Promise<void>;
   /** bisect 标记：不带 rev = 当前检出；带 rev = 标记历史提交 */
   bisectMarkOp: (term: BisectTerm, rev?: string) => Promise<void>;
   /** 结束二分并回到原分支 */
@@ -1590,6 +1594,30 @@ export const useStore = create<AppStore>()((set, get) => {
           throw new Error(res.stderr.trim() || 'git bisect reset 失败');
         }
         set({ bisectInfo: null });
+      });
+    },
+
+    /** 把当前分支重置到提交图里选中的任意提交（SmartGit 的 Reset HEAD to） */
+    async resetToOp(sha, mode) {
+      const branch = get().status?.branch.head ?? null;
+      const short = sha.slice(0, 7);
+      const bodies: Record<ResetMode, string> = {
+        soft: `分支指向移动到 ${short}，其后的提交内容保留在暂存区。`,
+        mixed: `分支指向移动到 ${short}，其后的提交改动回到工作区（未暂存）。不丢失文件内容。`,
+        hard: `分支指向移动到 ${short}，之后的提交将被丢弃，工作区未提交的改动也会全部丢失！\n操作前会自动创建备份（左栏「备份」可恢复）。`,
+      };
+      const ok = await confirmBox({
+        title: `重置${branch ? ` ${branch}` : ''} 到 ${short}（--${mode}）？`,
+        body: bodies[mode],
+        okText: mode === 'hard' ? '硬重置' : '重置',
+        danger: mode === 'hard',
+      });
+      if (!ok) return;
+      await mutate(`重置到 ${short}（${mode}）`, mode === 'hard', async () => {
+        const res = await resetTo(getRepoPath(), sha, mode);
+        if (res.code !== 0) {
+          throw new Error(res.stderr.trim() || 'git reset 失败');
+        }
       });
     },
 

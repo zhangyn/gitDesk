@@ -1,5 +1,12 @@
 import { runGit } from '../runner';
 
+export type ResetMode = 'soft' | 'mixed' | 'hard';
+
+/** 把当前分支重置到指定提交。soft=改动留暂存区，mixed=改动回工作区，hard=全部丢弃 */
+export async function resetTo(repoPath: string, sha: string, mode: ResetMode) {
+  return runGit(['reset', `--${mode}`, sha], { cwd: repoPath, timeoutMs: 120_000 });
+}
+
 /** 新建并切换到新分支 */
 export async function createBranch(repoPath: string, name: string, startAt?: string) {
   const args = ['switch', '-c', name];
