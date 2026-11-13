@@ -1,6 +1,6 @@
 import type { GraphRow } from './layout';
 
-export const ROW_HEIGHT = 28;
+export const ROW_HEIGHT = 32;
 /** 泳道基准宽度（泳道少时用它） */
 export const LANE_WIDTH = 13;
 export const PAD_X = 8;

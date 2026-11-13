@@ -1001,7 +1001,7 @@ body.is-resizing {
   position: absolute;
   left: 0;
   right: 0;
-  height: 28px;
+  height: 32px;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -3336,4 +3336,114 @@ body.is-resizing-x {
   .pane-head.file-head .spacer {
     flex: 1 1 12px;
   }
+}
+
+/* ==================== v14：整体放宽一档（更大气） ==================== */
+
+/* 工具栏 */
+.toolbar {
+  height: 48px;
+  gap: 5px;
+  padding: 0 10px;
+}
+
+.tb-btn {
+  height: 30px;
+  padding: 0 11px;
+  gap: 5px;
+  font-size: 13.5px;
+}
+
+/* 图标按钮：19px 偏小（左栏区块右上角的 +/✕ 就是它），统一放大到 24px */
+.icon-btn {
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+  border-radius: 5px;
+}
+
+/* 主/次按钮 */
+.btn {
+  padding: 6px 14px;
+  font-size: 13.5px;
+}
+
+.btn.small {
+  padding: 4px 11px;
+  font-size: 13px;
+}
+
+/* 状态字母 chip */
+.chip {
+  width: 17px;
+  height: 18px;
+  font-size: 12px;
+}
+
+/* 面板标题条 */
+.pane-head {
+  height: 34px;
+  padding: 0 11px;
+  font-size: 13.5px;
+}
+
+.files-head {
+  height: 34px;
+}
+
+.pane-head.commit-head,
+.pane-head.file-head {
+  min-height: 34px;
+}
+
+/* 状态条 */
+.statusbar {
+  height: 28px;
+  padding: 0 11px;
+  font-size: 12.5px;
+}
+
+/* 菜单项 */
+.menu-item {
+  padding: 7px 11px;
+  font-size: 14px;
+}
+
+/* 下拉选择 */
+.mini-select {
+  padding: 4px 20px 4px 8px;
+  font-size: 13px;
+}
+
+/* 左栏列表行：更松 */
+.chg-main {
+  padding: 4px 6px 4px 8px;
+  gap: 8px;
+}
+
+.ref-main {
+  padding: 4px 6px 4px 20px;
+  gap: 8px;
+}
+
+.ref-row,
+.chg-row {
+  font-size: 14px;
+}
+
+.repo-item-main {
+  padding: 4px 6px 4px 11px;
+  font-size: 14px;
+}
+
+/* 区块标题 */
+.section-head {
+  padding: 7px 8px;
+  font-size: 13.5px;
+}
+
+/* diff 文本：字号/行距放宽，长时间看更舒服 */
+.diff {
+  font-size: 13.5px;
+  line-height: 20px;
 }
