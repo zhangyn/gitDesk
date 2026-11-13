@@ -3309,3 +3309,31 @@ body.is-resizing-x {
   display: block;
   resize: vertical;
 }
+
+/* ==================== v13：详情头折行 ==================== */
+
+/* 提交头/文件头的操作按钮很多，面板变窄时必须允许折行，
+   否则右侧的按钮（重置/HunkNav/视图切换）会被 overflow:hidden 裁掉看不见。
+   spacer 把信息区和按钮区分开：折行后第一行是提交信息，第二行起是操作按钮。 */
+.pane-head.commit-head,
+.pane-head.file-head {
+  height: auto;
+  min-height: 29px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  row-gap: 3px;
+}
+
+.pane-head.commit-head .spacer,
+.pane-head.file-head .spacer {
+  /* 折行场景下 spacer 要能被挤掉，别霸占一整行 */
+  flex: 0 0 12px;
+}
+
+@media (min-width: 1280px) {
+  .pane-head.commit-head .spacer,
+  .pane-head.file-head .spacer {
+    flex: 1 1 12px;
+  }
+}
