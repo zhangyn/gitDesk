@@ -3,7 +3,7 @@ import { countEntries, useStore } from '../store';
 import { MenuItem, MenuSep, Popover } from '../ui/Popover';
 import { promptBox } from '../ui/dialog';
 import type { RefEntry } from '../types';
-import { THEME_LABEL, nextTheme } from '../ui/theme';
+import { THEME_LABEL, flipTheme } from '../ui/theme';
 import { CompareDialog } from './CompareDialog';
 import {
   IconAuto,
@@ -424,7 +424,7 @@ export function Toolbar() {
       />
       <button
         className="tb-btn"
-        onClick={() => setTheme(nextTheme(theme))}
+        onClick={() => setTheme(flipTheme(theme))}
         title={`主题：${THEME_LABEL[theme]}（点击切换，Ctrl+Shift+L）`}
       >
         {theme === 'light' ? (

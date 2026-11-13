@@ -45,6 +45,14 @@ export const THEME_LABEL: Record<Theme, string> = {
   system: '跟随系统',
 };
 
-export function nextTheme(t: Theme): Theme {
-  return t === 'dark' ? 'light' : t === 'light' ? 'system' : 'dark';
+/**
+ * 在深/浅之间取反（工具栏主题按钮 / Ctrl+Shift+L 用）。
+ * 关键：从 system 进入时按「当前实际显示的主题」取反，而不是三态循环——
+ * 旧的三态顺序（light → system → dark）里，system 经常解析回和浅色一样的结果
+ * （手动选过浅色后，window.setTheme 会把 prefers-color-scheme 一并钉住），
+ * 用户点一下看不到任何变化，像"深色坏了"。
+ * system 保留为初始默认值；一旦手动切换就变成显式的深/浅。
+ */
+export function flipTheme(current: Theme): Theme {
+  return resolve(current) === 'dark' ? 'light' : 'dark';
 }

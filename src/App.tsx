@@ -10,6 +10,7 @@ import { DiffModal } from './features/DiffModal';
 import { CredentialDialog } from './features/CredentialDialog';
 import { ModalHost } from './ui/Modal';
 import { StatusBar } from './features/StatusBar';
+import { flipTheme } from './ui/theme';
 
 const LEFT_KEY = 'gitdesk.leftWidth';
 const LEFT_MIN = 190;
@@ -75,7 +76,7 @@ export default function App() {
         setBottomPanel('commit');
       } else if (mod && e.shiftKey && e.key.toLowerCase() === 'l') {
         e.preventDefault();
-        setTheme(theme === 'light' ? 'dark' : 'light');
+        setTheme(flipTheme(theme));
       } else if (e.key === 'Escape' && bottomPanel !== 'none') {
         setBottomPanel(bottomPanel);
       }
