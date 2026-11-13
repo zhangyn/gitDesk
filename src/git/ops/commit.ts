@@ -53,9 +53,23 @@ export async function getRecentCommitMessages(repoPath: string, limit = 15): Pro
 }
 
 /**
- * 撤销最后一次提交：reset --soft HEAD~1，HEAD 后移一位，改动完整回到暂存区。
- * 对根提交会失败（没有父提交），由调用方把 stderr 展示给用户。
+ * 撤销最后一次提交，改动完整回到暂存区。
+ * - 有父提交：git reset --soft HEAD~1
+ * - 根提交（仓库里只有这一个提交）：HEAD~1 不存在，用 git update-ref -d HEAD
+ *   把分支退回"未出生"状态——index 和工作区原样保留，等效于"回到第一次提交之前"
+ * - detached HEAD 的根提交无法安全撤销，直接报错
  */
-export async function undoLastCommit(repoPath: string) {
-  return runGit(['reset', '--soft', 'HEAD~1'], { cwd: repoPath, timeoutMs: 60_000 });
+export async function undoLastCommit(repoPath: string, onBranch: boolean) {
+  const parent = await runGit(['rev-parse', '-q', '--verify', 'HEAD~1'], {
+    cwd: repoPath,
+    quiet: true,
+    timeoutMs: 15_000,
+  });
+  if (parent.code === 0 && parent.stdout.trim()) {
+    return runGit(['reset', '--soft', 'HEAD~1'], { cwd: repoPath, timeoutMs: 60_000 });
+  }
+  if (!onBranch) {
+    throw new Error('detached HEAD 下的根提交无法撤销。请先切到一个分支。');
+  }
+  return runGit(['update-ref', '-d', 'HEAD'], { cwd: repoPath, timeoutMs: 60_000 });
 }

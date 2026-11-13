@@ -62,7 +62,15 @@ export async function getLog(
   const args = ['log', ...refs];
   if (exclude.length > 0) args.push('--not', ...exclude);
   args.push('--topo-order', '-n', String(limit), `--format=${LOG_FORMAT}`);
-  const res = await runGitChecked(args, { cwd: repoPath, timeoutMs: 30_000 });
+  const res = await runGit(args, { cwd: repoPath, timeoutMs: 30_000 });
+  if (res.code !== 0) {
+    // 还没有任何提交（全新仓库 / 撤销掉了唯一的提交）是正常状态，返回空列表，
+    // 不把 "does not have any commits yet" 当错误弹出来
+    if (/does not have any commits yet|bad revision ('?HEAD'?|'\^\^?')/i.test(res.stderr)) {
+      return [];
+    }
+    throw new Error(res.stderr.trim() || res.stdout.trim() || `git log 退出码 ${res.code}`);
+  }
   return parseLog(res.stdout);
 }
 

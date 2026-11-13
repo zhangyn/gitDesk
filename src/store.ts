@@ -1533,19 +1533,20 @@ export const useStore = create<AppStore>()((set, get) => {
       });
     },
 
-    /** 撤销最后一次提交：改动完整回到暂存区，不改写任何历史内容 */
+    /** 撤销最后一次提交：改动完整回到暂存区（根提交也能撤，退回"未出生"分支） */
     async undoLastCommitOp(sha) {
       const ok = await confirmBox({
         title: `撤销提交 ${sha.slice(0, 7)}？`,
-        body: '相当于 git reset --soft HEAD~1：提交消失，改动全部回到暂存区。只对本地未推送的提交使用。',
+        body: '相当于 git reset --soft：提交消失，改动全部回到暂存区。只对本地未推送的提交使用。',
         okText: '撤销',
         danger: true,
       });
       if (!ok) return;
+      const onBranch = get().status?.branch.head !== null;
       await mutate('撤销提交', true, async () => {
-        const res = await undoLastCommit(getRepoPath());
+        const res = await undoLastCommit(getRepoPath(), onBranch);
         if (res.code !== 0) {
-          throw new Error(res.stderr.trim() || '撤销失败（根提交或历史不连续时无法撤销）');
+          throw new Error(res.stderr.trim() || '撤销失败');
         }
       });
     },
