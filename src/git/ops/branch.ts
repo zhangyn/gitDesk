@@ -14,6 +14,11 @@ export async function createBranch(repoPath: string, name: string, startAt?: str
   return runGit(args, { cwd: repoPath, timeoutMs: 60_000 });
 }
 
+/** 在指定提交上创建分支（不切换工作区，SmartGit 的 Add Branch 语义） */
+export async function createBranchAt(repoPath: string, name: string, sha: string) {
+  return runGit(['branch', name, sha], { cwd: repoPath, timeoutMs: 60_000 });
+}
+
 /** 切换分支。工作区脏时 git 可能拒绝，错误原样返回给 UI。 */
 export async function switchBranch(repoPath: string, name: string) {
   return runGit(['switch', name], { cwd: repoPath, timeoutMs: 120_000 });

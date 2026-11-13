@@ -169,7 +169,7 @@ export function RefsPanel() {
       )}
       <Section
         title="本地分支"
-        tip="勾选框控制该分支是否参与上方的提交图：取消勾选即从图中收起这条开发线（当前分支始终显示）。双击分支切换检出。"
+        tip="勾选框控制该分支是否参与上方提交图：取消勾选后，这条分支独有的提交从图里消失、泳道收起；已合并进其他分支的提交仍会显示（通过别的分支仍可达）。用来在多分支仓库里收起不关心的开发线。当前分支始终显示。双击分支切换检出。"
         count={branches.length}
         action={
           <button className="icon-btn" title="新建分支" onClick={() => void newBranch()}>

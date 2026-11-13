@@ -70,6 +70,7 @@ import {
   cherryPickAbort,
   cherryPickContinue,
   createBranch,
+  createBranchAt,
   createTrackingBranch,
   deleteBranch,
   getOngoingOperation,
@@ -451,6 +452,8 @@ interface AppStore {
   setBottomPanel: (p: BottomPanel) => void;
 
   createBranchOp: (name: string) => Promise<void>;
+  /** 在指定提交上创建分支（不切换工作区） */
+  createBranchAtOp: (name: string, sha: string) => Promise<void>;
   switchBranchOp: (name: string) => Promise<void>;
   deleteBranchOp: (name: string) => Promise<void>;
   mergeBranchOp: (name: string, squash?: boolean) => Promise<void>;
@@ -465,7 +468,7 @@ interface AppStore {
   /** 读取 HEAD reflog（RefsPanel 的 Reflog 区块） */
   loadReflog: () => Promise<void>;
 
-  createTagOp: (name: string, message: string) => Promise<void>;
+  createTagOp: (name: string, message: string, at?: string) => Promise<void>;
   deleteTagOp: (name: string) => Promise<void>;
 
   restoreBackupOp: (sha: string) => Promise<void>;
@@ -1717,6 +1720,14 @@ export const useStore = create<AppStore>()((set, get) => {
       });
     },
 
+    /** 在指定提交上创建分支（不切换工作区，提交图右键菜单用） */
+    async createBranchAtOp(name, sha) {
+      await mutate(`在 ${sha.slice(0, 7)} 上创建分支 ${name}`, false, async () => {
+        const res = await createBranchAt(getRepoPath(), name, sha);
+        if (res.code !== 0) throw new Error(res.stderr.trim() || '创建分支失败');
+      });
+    },
+
     async switchBranchOp(name) {
       await mutate(`切换到 ${name}`, false, async () => {
         const res = await switchBranch(getRepoPath(), name);
@@ -1848,9 +1859,9 @@ export const useStore = create<AppStore>()((set, get) => {
       });
     },
 
-    async createTagOp(name, message) {
+    async createTagOp(name, message, at) {
       await mutate(`创建标签 ${name}`, false, async () => {
-        const res = await createTag(getRepoPath(), name, message);
+        const res = await createTag(getRepoPath(), name, message, at);
         if (res.code !== 0) throw new Error(res.stderr.trim() || '创建标签失败');
       });
     },

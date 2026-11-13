@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useStore } from '../store';
 import { drawGraph, graphWidthFor, ROW_HEIGHT } from './graph/drawGraph';
 import { copyText } from '../ui/clipboard';
+import { ContextMenu, type CtxItem } from '../ui/ContextMenu';
+import { promptBox } from '../ui/dialog';
 
 const DATE_FMT = new Intl.DateTimeFormat('zh-CN', {
   month: '2-digit',
@@ -39,6 +41,127 @@ export function CommitList() {
   const loadMoreLog = useStore((s) => s.loadMoreLog);
   const openDiffModal = useStore((s) => s.openDiffModal);
   const busy = useStore((s) => s.busy);
+  const cherryPickOp = useStore((s) => s.cherryPickOp);
+  const revertOp = useStore((s) => s.revertOp);
+  const resetToOp = useStore((s) => s.resetToOp);
+  const bisectStartOp = useStore((s) => s.bisectStartOp);
+  const bisectMarkOp = useStore((s) => s.bisectMarkOp);
+  const bisecting = useStore((s) => s.bisecting);
+  const createBranchAtOp = useStore((s) => s.createBranchAtOp);
+  const createTagOp = useStore((s) => s.createTagOp);
+
+  /** 右键菜单的锚点：屏幕坐标 + 目标提交 */
+  const [ctx, setCtx] = useState<{ x: number; y: number; sha: string; subject: string } | null>(
+    null,
+  );
+
+  const openCtx = (e: React.MouseEvent, sha: string, subject: string): void => {
+    e.preventDefault();
+    setCtx({ x: e.clientX, y: e.clientY, sha, subject });
+  };
+
+  /** 右键菜单项（SmartGit 的 Graph 右键操作集，按 gitDesk 现有能力适配） */
+  const ctxItems: CtxItem[] = useMemo(() => {
+    if (!ctx) return [];
+    const { sha, subject } = ctx;
+    const dis = busy !== null;
+    const items: CtxItem[] = [
+      { label: '查看这个提交', onClick: () => void openCommit(sha) },
+      { label: '复制 SHA', onClick: () => void copyText(sha) },
+      { label: '复制提交说明', onClick: () => void copyText(subject) },
+      {
+        label: '拣选到此分支',
+        onClick: () => void cherryPickOp(sha),
+        sepBefore: true,
+        disabled: dis,
+      },
+      { label: '还原此提交…', onClick: () => void revertOp(sha), disabled: dis },
+      {
+        label: '软重置到此（改动留暂存区）',
+        onClick: () => void resetToOp(sha, 'soft'),
+        sepBefore: true,
+        disabled: dis,
+      },
+      {
+        label: '混合重置到此（改动回工作区）',
+        onClick: () => void resetToOp(sha, 'mixed'),
+        disabled: dis,
+      },
+      {
+        label: '硬重置到此（丢弃提交与未提交改动）',
+        onClick: () => void resetToOp(sha, 'hard'),
+        danger: true,
+        disabled: dis,
+      },
+      {
+        label: '在此提交新建分支…',
+        onClick: async () => {
+          const name = await promptBox({
+            title: `在 ${shortSha(sha)} 上新建分支`,
+            label: '分支名（只创建，不切换工作区）',
+            placeholder: 'feature/xxx',
+            okText: '创建',
+          });
+          if (name) void createBranchAtOp(name.trim(), sha);
+        },
+        sepBefore: true,
+        disabled: dis,
+      },
+      {
+        label: '在此提交打标签…',
+        onClick: async () => {
+          const name = await promptBox({
+            title: `在 ${shortSha(sha)} 上打标签`,
+            label: '标签名',
+            placeholder: 'v1.0.0',
+            okText: '下一步',
+          });
+          if (!name) return;
+          const message = await promptBox({
+            title: `标签 ${name} 的说明`,
+            label: '留空 = 轻量标签；填写 = 附注标签',
+            okText: '创建',
+          });
+          void createTagOp(name.trim(), message ?? '', sha);
+        },
+        disabled: dis,
+      },
+    ];
+    if (bisecting) {
+      items.push({
+        label: '二分：标记为好',
+        onClick: () => void bisectMarkOp('good', sha),
+        sepBefore: true,
+        disabled: dis,
+      });
+      items.push({
+        label: '二分：标记为坏',
+        onClick: () => void bisectMarkOp('bad', sha),
+        danger: true,
+        disabled: dis,
+      });
+    } else {
+      items.push({
+        label: '开始二分（此提交设为坏）',
+        onClick: () => void bisectStartOp(sha),
+        sepBefore: true,
+        disabled: dis,
+      });
+    }
+    return items;
+  }, [
+    ctx,
+    busy,
+    openCommit,
+    cherryPickOp,
+    revertOp,
+    resetToOp,
+    bisectStartOp,
+    bisectMarkOp,
+    bisecting,
+    createBranchAtOp,
+    createTagOp,
+  ]);
 
   const [searchMode, setSearchMode] = useState<'message' | 'path'>('message');
   const [searchText, setSearchText] = useState('');
@@ -322,6 +445,7 @@ export function CommitList() {
                   className={`commit-row${i === selectedIndex ? ' is-selected' : ''}`}
                   style={{ top: i * ROW_HEIGHT, paddingLeft: width + 6 }}
                   onClick={() => void openCommit(c.sha)}
+                  onContextMenu={(e) => openCtx(e, c.sha, c.subject)}
                 >
                   {c.refs.length > 0 && (
                     <span className="refs" title={c.refs.join(' · ')}>
@@ -370,6 +494,8 @@ export function CommitList() {
           </div>
         </div>
       </div>
+
+      {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={ctxItems} onClose={() => setCtx(null)} />}
     </>
   );
 }
