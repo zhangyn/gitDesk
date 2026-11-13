@@ -368,6 +368,9 @@ interface AppStore {
   /** 中区面板布局：图在上 / 图在下 / 经典三行（工具栏「更多」菜单切换） */
   centerLayout: CenterLayout;
   setCenterLayout: (l: CenterLayout) => void;
+  /** Ctrl+P 快速切换面板（分支/提交混合搜索） */
+  quickSwitch: boolean;
+  setQuickSwitch: (v: boolean) => void;
 
   target: DiffTarget | null;
   worktreePatches: FilePatch[];
@@ -796,6 +799,7 @@ export const useStore = create<AppStore>()((set, get) => {
     bottomPanel: 'none',
     theme: loadTheme(),
     centerLayout: loadCenterLayout(),
+    quickSwitch: false,
 
     setCenterLayout(l) {
       set({ centerLayout: l });
@@ -804,6 +808,10 @@ export const useStore = create<AppStore>()((set, get) => {
       } catch {
         /* 忽略配额错误 */
       }
+    },
+
+    setQuickSwitch(v) {
+      set({ quickSwitch: v });
     },
 
     async boot() {
@@ -1740,8 +1748,41 @@ export const useStore = create<AppStore>()((set, get) => {
       });
     },
 
+    /**
+     * 切换分支。工作区脏时 git 会拒绝——先确认，用户同意则走
+     * stash → 切换 → pop 三连（SmartGit 的引导行为），失败自动回滚 stash。
+     */
     async switchBranchOp(name) {
+      const status = get().status;
+      const dirty = (status?.entries.length ?? 0) > 0;
+      if (dirty) {
+        const ok = await confirmBox({
+          title: `切换到 ${name}？`,
+          body: '工作区还有未提交的改动。将自动：stash 保存 → 切换 → 应用回改动。\n若切回后想恢复，可随时对原分支重复同样操作。',
+          okText: '保存改动并切换',
+        });
+        if (!ok) return;
+      }
       await mutate(`切换到 ${name}`, false, async () => {
+        if (dirty) {
+          const st = await saveStash(getRepoPath(), `切换前自动备份 → ${name}`);
+          if (st.code !== 0) {
+            throw new Error(st.stderr.trim() || '自动 stash 失败，未切换分支');
+          }
+          const sw = await switchBranch(getRepoPath(), name);
+          if (sw.code !== 0) {
+            // 切换失败要把 stash 还回来，不然用户的改动"消失"了
+            await applyStash(getRepoPath(), 'stash@{0}', true);
+            throw new Error(sw.stderr.trim() || '切换分支失败（改动已恢复到工作区）');
+          }
+          const back = await applyStash(getRepoPath(), 'stash@{0}', false);
+          if (back.code !== 0) {
+            throw new Error(
+              `已切换到 ${name}，但改动还在 stash@{0} 里（可能有冲突）：${back.stderr.trim()}`,
+            );
+          }
+          return;
+        }
         const res = await switchBranch(getRepoPath(), name);
         if (res.code !== 0) throw new Error(res.stderr.trim() || '切换分支失败');
       });

@@ -3527,3 +3527,108 @@ body.is-resizing-x {
   font-size: 12.5px;
   white-space: pre-wrap;
 }
+
+/* ==================== v16：Ctrl+P 快速切换 / 同步横幅 ==================== */
+
+.quick-switch {
+  width: min(560px, calc(100vw - 80px));
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.qs-input {
+  padding: 9px 11px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 14px;
+  outline: none;
+}
+
+.qs-input:focus {
+  border-color: var(--accent);
+}
+
+.qs-list {
+  max-height: 46vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.qs-hit {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 13.5px;
+  color: var(--fg-dim);
+}
+
+.qs-hit.is-active {
+  background: var(--sel);
+  color: var(--fg);
+}
+
+.qs-kind {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.qs-branch {
+  background: rgba(126, 231, 135, 0.14);
+  color: var(--accent-2);
+}
+
+.qs-commit {
+  background: rgba(88, 166, 255, 0.14);
+  color: var(--accent);
+}
+
+.qs-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qs-sub {
+  flex: 0 1 auto;
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qs-empty {
+  padding: 18px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* 同步状态横幅：信息色偏蓝，与「进行中」横幅区分 */
+.sync-banner .ob-title {
+  color: var(--accent);
+}
+
+.ob-sep {
+  margin: 0 6px;
+  color: var(--muted);
+}

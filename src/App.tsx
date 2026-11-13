@@ -11,6 +11,7 @@ import { CredentialDialog } from './features/CredentialDialog';
 import { ModalHost } from './ui/Modal';
 import { StatusBar } from './features/StatusBar';
 import { ToastHost } from './features/ToastHost';
+import { QuickSwitch } from './features/QuickSwitch';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { flipTheme } from './ui/theme';
 
@@ -47,6 +48,11 @@ export default function App() {
   const bisectInfo = useStore((s) => s.bisectInfo);
   const bisectMarkOp = useStore((s) => s.bisectMarkOp);
   const bisectResetOp = useStore((s) => s.bisectResetOp);
+  const pushOp = useStore((s) => s.pushOp);
+  const pullOp = useStore((s) => s.pullOp);
+  const hasRemoteOp = useStore((s) => s.remotes.length > 0);
+  const quickSwitchOpen = useStore((s) => s.quickSwitch);
+  const setQuickSwitch = useStore((s) => s.setQuickSwitch);
 
   const [leftW, setLeftW] = useState(loadLeftWidth);
   const hostRef = useRef<HTMLElement | null>(null);
@@ -76,6 +82,9 @@ export default function App() {
       } else if (mod && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setBottomPanel('commit');
+      } else if (mod && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        setQuickSwitch(!quickSwitchOpen);
       } else if (mod && e.shiftKey && e.key.toLowerCase() === 'l') {
         e.preventDefault();
         setTheme(flipTheme(theme));
@@ -85,7 +94,16 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [refresh, pickRepo, setBottomPanel, bottomPanel, theme, setTheme]);
+  }, [
+    refresh,
+    pickRepo,
+    setBottomPanel,
+    bottomPanel,
+    theme,
+    setTheme,
+    quickSwitchOpen,
+    setQuickSwitch,
+  ]);
 
   const startDragLeft = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -194,6 +212,46 @@ export default function App() {
               </div>
             )}
 
+            {/* 同步状态横幅：本地领先/落后上游时给出下一步动作（GitHub Desktop 式） */}
+            {!ongoing &&
+              !bisecting &&
+              !!status?.branch.head &&
+              status.branch.upstream &&
+              (status.branch.ahead > 0 || status.branch.behind > 0) && (
+                <div className="ongoing-banner sync-banner">
+                  <span className="ob-title">
+                    {status.branch.ahead > 0 && (
+                      <>
+                        领先 {status.branch.upstream} {status.branch.ahead} 个提交{' '}
+                      </>
+                    )}
+                    {status.branch.ahead > 0 && status.branch.behind > 0 && (
+                      <span className="ob-sep">·</span>
+                    )}
+                    {status.branch.behind > 0 && <>落后 {status.branch.behind} 个提交</>}
+                  </span>
+                  <span className="spacer" />
+                  <button
+                    className="btn small primary"
+                    disabled={busy !== null || !hasRemoteOp}
+                    onClick={() => void pushOp(false)}
+                    title={`推送到 ${status.branch.upstream}`}
+                  >
+                    推送
+                  </button>
+                  {status.branch.behind > 0 && (
+                    <button
+                      className="btn small"
+                      disabled={busy !== null || !hasRemoteOp}
+                      onClick={() => void pullOp('ff-only')}
+                      title={`从 ${status.branch.upstream} 拉取（仅快进）`}
+                    >
+                      拉取
+                    </button>
+                  )}
+                </div>
+              )}
+
             <main
               className="workspace"
               ref={hostRef}
@@ -221,6 +279,7 @@ export default function App() {
         <DiffModal />
         <CredentialDialog />
         <ModalHost />
+        <QuickSwitch />
 
         {error && (
           <div className="error-bar">
