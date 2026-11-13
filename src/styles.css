@@ -3157,14 +3157,6 @@ body.is-resizing-x {
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* 提交信息 72 列参考线（mono 字体下 ch 与字符等宽） */
-.commit-msg {
-  background-image: linear-gradient(to right, var(--border) 1px, transparent 1px);
-  background-repeat: no-repeat;
-  background-position: calc(9px + 72ch) 0;
-  background-size: 1px 100%;
-}
-
 /* 左栏 refs 过滤框（复用 changes-filter 的输入样式，只补外边距） */
 .refs-filter {
   margin: 0 8px 6px;
