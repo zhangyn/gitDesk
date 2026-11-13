@@ -3308,8 +3308,12 @@ body.is-resizing-x {
   flex-wrap: wrap;
 }
 
-/* 弹窗里的提交信息框：去掉底部面板的边距，占满宽度 */
+/* 弹窗里的提交信息框：去掉底部面板的边距，铺满弹窗宽度
+   （旧底部面板靠 flex 拉伸，弹窗是普通块级容器，得显式给宽） */
 .commit-dialog .commit-msg {
   margin: 10px 0 0;
   min-height: 96px;
+  width: 100%;
+  display: block;
+  resize: vertical;
 }
