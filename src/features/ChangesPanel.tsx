@@ -60,6 +60,7 @@ function ChangeRow({ entry, order }: { entry: StatusEntry; order: string[] }) {
   const stageEntry = useStore((s) => s.stageEntry);
   const unstageEntry = useStore((s) => s.unstageEntry);
   const discardEntry = useStore((s) => s.discardEntry);
+  const ignoreEntry = useStore((s) => s.ignoreEntry);
   const busy = useStore((s) => s.busy);
 
   const untracked = entry.kind === 'untracked';
@@ -140,6 +141,16 @@ function ChangeRow({ entry, order }: { entry: StatusEntry; order: string[] }) {
               onClick={() => void unstageEntry(entry)}
             >
               −
+            </button>
+          )}
+          {untracked && (
+            <button
+              className="icon-btn"
+              title="忽略：写入 .gitignore，以后不再出现在变更列表"
+              disabled={disabled}
+              onClick={() => void ignoreEntry(entry)}
+            >
+              ⃠
             </button>
           )}
           {worktree && (

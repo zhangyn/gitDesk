@@ -3447,3 +3447,83 @@ body.is-resizing-x {
   font-size: 13.5px;
   line-height: 20px;
 }
+
+/* ==================== v15：toast / 忽略按钮 / 错误兜底 ==================== */
+
+/* 右下角成功提示堆栈 */
+.toast-host {
+  position: fixed;
+  right: 14px;
+  bottom: 38px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.toast {
+  padding: 7px 13px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--fg-dim);
+  font-size: 12.5px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  cursor: default;
+  animation: toast-in 0.16s ease-out;
+}
+
+.toast-ok {
+  border-color: color-mix(in srgb, var(--accent-2) 40%, var(--border));
+  color: var(--fg);
+}
+
+.toast-ok::before {
+  color: var(--accent-2);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* React 渲染异常兜底页 */
+.error-boundary {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--bg);
+  color: var(--fg);
+  padding: 24px;
+}
+
+.eb-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.eb-detail {
+  max-width: 720px;
+  max-height: 40vh;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  color: var(--danger);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  white-space: pre-wrap;
+}

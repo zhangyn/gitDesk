@@ -1,4 +1,12 @@
+import { invoke } from '@tauri-apps/api/core';
 import { runGit, runGitChecked } from '../runner';
+
+interface ReadResult {
+  text: string;
+  binary: boolean;
+  truncated: boolean;
+  size: number;
+}
 
 /** 暂存整个文件（含删除、重命名） */
 export async function stageFile(repoPath: string, path: string): Promise<void> {
@@ -118,4 +126,35 @@ export async function cleanPreview(repoPath: string): Promise<string[]> {
 export async function cleanUntracked(repoPath: string): Promise<void> {
   const res = await runGit(['clean', '-f', '-d'], { cwd: repoPath, timeoutMs: 60_000 });
   if (res.code !== 0) throw new Error(res.stderr.trim() || 'git clean 失败');
+}
+
+/* ---------------------------------------------------------- 忽略文件 */
+
+/**
+ * 把路径加入 .gitignore（同目录的 .gitignore，不存在则创建），然后清掉该路径的
+ * 暂存记录（如果有）。SmartGit 的 Ignore 语义。
+ * 追加前先读旧内容，避免覆盖用户已有的忽略规则。
+ */
+export async function ignorePath(repoPath: string, relPath: string): Promise<void> {
+  // 目录与文件写法不同：目录加尾部斜杠更清晰
+  const entry = relPath.includes('/') ? relPath : `/${relPath}`;
+  const gitignorePath = `${repoPath}/.gitignore`;
+  let existing = '';
+  try {
+    const res = await invoke<ReadResult>('read_text_file', {
+      req: { path: gitignorePath, maxBytes: 1024 * 1024 },
+    });
+    existing = res.binary ? '' : res.text;
+  } catch {
+    /* 文件不存在 → 新建 */
+  }
+  const lines = existing.split(/\r?\n/);
+  // 已经忽略了就不重复写
+  if (lines.some((l) => l.trim() === entry.trim())) return;
+  const base = existing.length > 0 && !existing.endsWith('\n') ? `${existing}\n` : existing;
+  await invoke('write_text_file', {
+    req: { path: gitignorePath, content: `${base}${entry}\n` },
+  });
+  // 若之前被误 add 过，取消暂存（未跟踪则无害失败）
+  await runGit(['reset', '-q', '--', relPath], { cwd: repoPath, timeoutMs: 30_000 });
 }

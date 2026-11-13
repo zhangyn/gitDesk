@@ -10,6 +10,8 @@ import { DiffModal } from './features/DiffModal';
 import { CredentialDialog } from './features/CredentialDialog';
 import { ModalHost } from './ui/Modal';
 import { StatusBar } from './features/StatusBar';
+import { ToastHost } from './features/ToastHost';
+import { ErrorBoundary } from './ui/ErrorBoundary';
 import { flipTheme } from './ui/theme';
 
 const LEFT_KEY = 'gitdesk.leftWidth';
@@ -117,118 +119,121 @@ export default function App() {
   };
 
   return (
-    <div className="app">
-      <Toolbar />
+    <ErrorBoundary>
+      <div className="app">
+        <Toolbar />
 
-      {repo ? (
-        <>
-          {ongoing && (
-            <div className="ongoing-banner">
-              <span className="ob-title">进行中：{ongoing}</span>
-              <span className="ob-sub">
-                {(status?.entries ?? []).filter((e) => e.kind === 'unmerged').length > 0
-                  ? `还有 ${
-                      (status?.entries ?? []).filter((e) => e.kind === 'unmerged').length
-                    } 个冲突文件待解决`
-                  : '所有冲突已解决，可以继续'}
-              </span>
-              <span className="spacer" />
-              <button className="btn small primary" onClick={() => void continueOp()}>
-                继续
-              </button>
-              {ongoing === 'rebase' && (
-                <button className="btn small" onClick={() => void skipOp()}>
-                  跳过此提交
+        {repo ? (
+          <>
+            {ongoing && (
+              <div className="ongoing-banner">
+                <span className="ob-title">进行中：{ongoing}</span>
+                <span className="ob-sub">
+                  {(status?.entries ?? []).filter((e) => e.kind === 'unmerged').length > 0
+                    ? `还有 ${
+                        (status?.entries ?? []).filter((e) => e.kind === 'unmerged').length
+                      } 个冲突文件待解决`
+                    : '所有冲突已解决，可以继续'}
+                </span>
+                <span className="spacer" />
+                <button className="btn small primary" onClick={() => void continueOp()}>
+                  继续
                 </button>
-              )}
-              <button className="btn small danger" onClick={() => void abortOp()}>
-                中止
-              </button>
-            </div>
-          )}
+                {ongoing === 'rebase' && (
+                  <button className="btn small" onClick={() => void skipOp()}>
+                    跳过此提交
+                  </button>
+                )}
+                <button className="btn small danger" onClick={() => void abortOp()}>
+                  中止
+                </button>
+              </div>
+            )}
 
-          {bisecting && (
-            <div className="ongoing-banner bisect-banner">
-              <span className="ob-title">进行中：二分查找（bisect）</span>
-              <span className="ob-sub" title={bisectInfo ?? undefined}>
-                {bisectInfo
-                  ? bisectInfo
-                  : '先在提交详情里点「好标记」确定范围，然后测试当前检出的代码并标记'}
-              </span>
-              <span className="spacer" />
-              <button
-                className="btn small primary"
-                disabled={busy !== null}
-                title="git bisect good：当前检出的提交表现正常"
-                onClick={() => void bisectMarkOp('good')}
-              >
-                当前是好的
-              </button>
-              <button
-                className="btn small danger"
-                disabled={busy !== null}
-                title="git bisect bad：当前检出的提交有问题"
-                onClick={() => void bisectMarkOp('bad')}
-              >
-                当前是坏的
-              </button>
-              <button
-                className="btn small"
-                disabled={busy !== null}
-                title="git bisect skip：这个提交测不了，跳过它"
-                onClick={() => void bisectMarkOp('skip')}
-              >
-                跳过
-              </button>
-              <button
-                className="btn small"
-                disabled={busy !== null}
-                title="git bisect reset：结束二分并回到原分支"
-                onClick={() => void bisectResetOp()}
-              >
-                结束
-              </button>
-            </div>
-          )}
+            {bisecting && (
+              <div className="ongoing-banner bisect-banner">
+                <span className="ob-title">进行中：二分查找（bisect）</span>
+                <span className="ob-sub" title={bisectInfo ?? undefined}>
+                  {bisectInfo
+                    ? bisectInfo
+                    : '先在提交详情里点「好标记」确定范围，然后测试当前检出的代码并标记'}
+                </span>
+                <span className="spacer" />
+                <button
+                  className="btn small primary"
+                  disabled={busy !== null}
+                  title="git bisect good：当前检出的提交表现正常"
+                  onClick={() => void bisectMarkOp('good')}
+                >
+                  当前是好的
+                </button>
+                <button
+                  className="btn small danger"
+                  disabled={busy !== null}
+                  title="git bisect bad：当前检出的提交有问题"
+                  onClick={() => void bisectMarkOp('bad')}
+                >
+                  当前是坏的
+                </button>
+                <button
+                  className="btn small"
+                  disabled={busy !== null}
+                  title="git bisect skip：这个提交测不了，跳过它"
+                  onClick={() => void bisectMarkOp('skip')}
+                >
+                  跳过
+                </button>
+                <button
+                  className="btn small"
+                  disabled={busy !== null}
+                  title="git bisect reset：结束二分并回到原分支"
+                  onClick={() => void bisectResetOp()}
+                >
+                  结束
+                </button>
+              </div>
+            )}
 
-          <main
-            className="workspace"
-            ref={hostRef}
-            style={{ gridTemplateColumns: `${leftW}px ${SPLIT_W}px minmax(0, 1fr)` }}
-          >
-            <SidePanel />
-            <div
-              className="vsplitter"
-              onMouseDown={startDragLeft}
-              onDoubleClick={() => setLeftW(LEFT_DEFAULT)}
-              title="拖动调整左栏宽度 · 双击恢复默认"
-            />
-            <CenterStack />
-          </main>
+            <main
+              className="workspace"
+              ref={hostRef}
+              style={{ gridTemplateColumns: `${leftW}px ${SPLIT_W}px minmax(0, 1fr)` }}
+            >
+              <SidePanel />
+              <div
+                className="vsplitter"
+                onMouseDown={startDragLeft}
+                onDoubleClick={() => setLeftW(LEFT_DEFAULT)}
+                title="拖动调整左栏宽度 · 双击恢复默认"
+              />
+              <CenterStack />
+            </main>
 
-          {bottomPanel === 'commit' && <CommitDialog />}
-          {bottomPanel === 'log' && <CommandLog />}
-        </>
-      ) : (
-        <ProjectList />
-      )}
+            {bottomPanel === 'commit' && <CommitDialog />}
+            {bottomPanel === 'log' && <CommandLog />}
+          </>
+        ) : (
+          <ProjectList />
+        )}
 
-      <StatusBar />
+        <StatusBar />
 
-      <DiffModal />
-      <CredentialDialog />
-      <ModalHost />
+        <DiffModal />
+        <CredentialDialog />
+        <ModalHost />
 
-      {error && (
-        <div className="error-bar">
-          <span className="error-text">{error}</span>
-          <button className="btn small" onClick={clearError}>
-            关闭
-          </button>
-        </div>
-      )}
+        {error && (
+          <div className="error-bar">
+            <span className="error-text">{error}</span>
+            <button className="btn small" onClick={clearError}>
+              关闭
+            </button>
+          </div>
+        )}
 
-      {busy && <div className="busy-pill">{busy}</div>}
-    </div>
+        {busy && <div className="busy-pill">{busy}</div>}
+        <ToastHost />
+      </div>
+    </ErrorBoundary>
   );
 }

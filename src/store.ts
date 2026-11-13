@@ -44,6 +44,7 @@ import {
   cleanPreview,
   cleanUntracked,
   discardFileChanges,
+  ignorePath,
   stageAll,
   stageFile,
   stagePaths,
@@ -130,6 +131,7 @@ import { layoutGraph, type GraphRow } from './features/graph/layout';
 import { buildSelectedPatch } from './patch/build';
 import { confirmBox } from './ui/dialog';
 import { applyTheme, loadTheme, syncWindowTheme, watchSystemTheme } from './ui/theme';
+import { toast } from './stores/toast';
 
 const RECENT_KEY = 'gitdesk.recent';
 /** 每页加载多少条提交；点「加载更多」就再加一页 */
@@ -418,6 +420,8 @@ interface AppStore {
   stageEntry: (entry: StatusEntry) => Promise<void>;
   unstageEntry: (entry: StatusEntry) => Promise<void>;
   discardEntry: (entry: StatusEntry) => Promise<void>;
+  /** 忽略未跟踪文件/目录：写入 .gitignore 并取消误暂存 */
+  ignoreEntry: (entry: StatusEntry) => Promise<void>;
   stageAllOp: () => Promise<void>;
   unstageAllOp: () => Promise<void>;
 
@@ -620,6 +624,8 @@ export const useStore = create<AppStore>()((set, get) => {
       if (backup) await createBackup(repo.path, label);
       await fn();
       await reload();
+      // 成功反馈：写操作完成发一句 toast（错误仍走红色错误条，不在这里混）
+      toast(`${label} — 完成`);
       return true;
     } catch (e) {
       set({ error: errMsg(e) });
@@ -1434,6 +1440,12 @@ export const useStore = create<AppStore>()((set, get) => {
       await mutate('丢弃文件改动', !isUntracked, () =>
         discardFileChanges(getRepoPath(), entry.path, isUntracked),
       );
+    },
+
+    /** 忽略未跟踪文件/目录（写入同目录 .gitignore），从变更列表消失且不再骚扰 */
+    async ignoreEntry(entry) {
+      if (entry.kind !== 'untracked') return;
+      await mutate(`忽略 ${entry.path}`, false, () => ignorePath(getRepoPath(), entry.path));
     },
 
     async stageAllOp() {
