@@ -1053,7 +1053,8 @@ body.is-resizing {
 .refs {
   display: inline-flex;
   gap: 3px;
-  flex: 0 1 auto;
+  /* 宽度由行内 style 给定（可拖拽列宽），这里只兜底 */
+  flex: 0 0 auto;
   min-width: 0;
   max-width: 140px;
   overflow: hidden;
@@ -3650,4 +3651,74 @@ body.is-resizing-x {
 .mini-text:hover {
   background: var(--hover-2);
   color: var(--fg);
+}
+
+/* 提交历史的列标题（表头）：分支列可拖拽改宽 */
+.commit-cols {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 22px;
+  padding-right: 10px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-panel);
+  color: var(--dim-2);
+  font-size: 10.5px;
+  flex: 0 0 auto;
+  user-select: none;
+}
+
+.commit-cols .col {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-cols .col-refs {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.commit-cols .col-subject {
+  /* 与行内保持一致：主角列可收缩但有下限 */
+  flex: 1 1 auto;
+  min-width: 56px;
+}
+
+.commit-cols .col-author {
+  flex: 0 1 72px;
+  min-width: 0;
+  text-align: right;
+}
+
+.commit-cols .col-date {
+  flex: 0 0 78px;
+  text-align: right;
+}
+
+.commit-cols .col-sha {
+  flex: 0 0 54px;
+  text-align: right;
+}
+
+/* 拖拽把手：贴在分支列右边界 */
+.col-grip {
+  position: absolute;
+  right: -4px;
+  top: -2px;
+  bottom: -2px;
+  width: 8px;
+  cursor: col-resize;
+}
+
+.col-grip:hover {
+  background: var(--accent);
+  opacity: 0.6;
+}
+
+/* 分支列变宽后，单个徽标可以用满整列 */
+.commit-row .refs .badge {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
 }

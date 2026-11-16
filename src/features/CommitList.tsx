@@ -14,6 +14,17 @@ const DATE_FMT = new Intl.DateTimeFormat('zh-CN', {
 
 /** 距离底部多少像素就开始加载下一页 */
 const LOAD_MORE_THRESHOLD = 320;
+
+/** 分支（refs）列宽：可拖拽，双击复位 */
+const REFS_W_KEY = 'gitdesk.refsColWidth';
+const REFS_W_MIN = 60;
+const REFS_W_MAX = 460;
+const REFS_W_DEFAULT = 150;
+
+function loadRefsWidth(): number {
+  const n = Number(localStorage.getItem(REFS_W_KEY));
+  return Number.isFinite(n) && n >= REFS_W_MIN && n <= REFS_W_MAX ? n : REFS_W_DEFAULT;
+}
 const MORE_BAR_HEIGHT = 34;
 /** DOM 行虚拟化：视口外上下各多渲染几行，滚动时不露白 */
 const OVERSCAN = 10;
@@ -186,6 +197,44 @@ export function CommitList() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const loadingMoreRef = useRef(false);
+  const [refsW, setRefsW] = useState(loadRefsWidth);
+
+  const persistRefsW = useCallback((v: number) => {
+    const w = Math.max(REFS_W_MIN, Math.min(REFS_W_MAX, Math.round(v)));
+    setRefsW(w);
+    try {
+      localStorage.setItem(REFS_W_KEY, String(w));
+    } catch {
+      /* 忽略 */
+    }
+  }, []);
+
+  /** 拖动分支列右边界 */
+  const startDragRefs = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startW = refsW;
+      let latest = startW;
+      const onMove = (ev: MouseEvent) => {
+        const w = Math.max(REFS_W_MIN, Math.min(REFS_W_MAX, startW + ev.clientX - startX));
+        latest = w;
+        setRefsW(w);
+      };
+      const stop = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', stop);
+        window.removeEventListener('blur', stop);
+        document.body.classList.remove('is-resizing-x');
+        persistRefsW(latest);
+      };
+      document.body.classList.add('is-resizing-x');
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', stop);
+      window.addEventListener('blur', stop);
+    },
+    [refsW, persistRefsW],
+  );
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -422,6 +471,22 @@ export function CommitList() {
   return (
     <>
       {head}
+      <div className="commit-cols" style={{ paddingLeft: width + 6 }}>
+        <span className="col col-refs" style={{ flex: `0 0 ${refsW}px`, width: refsW }}>
+          分支
+          <span
+            className="col-grip"
+            onMouseDown={startDragRefs}
+            onDoubleClick={() => persistRefsW(REFS_W_DEFAULT)}
+            title="拖动调整分支列宽 · 双击复位"
+          />
+        </span>
+        <span className="col col-subject">提交信息</span>
+        <span className="col col-author">作者</span>
+        <span className="col col-date">时间</span>
+        <span className="col col-sha">哈希</span>
+      </div>
+
       <div className="commit-wrap">
         <canvas ref={canvasRef} className="commit-canvas" />
         <div
@@ -447,15 +512,22 @@ export function CommitList() {
                   onClick={() => void openCommit(c.sha)}
                   onContextMenu={(e) => openCtx(e, c.sha, c.subject)}
                 >
-                  {c.refs.length > 0 && (
-                    <span className="refs" title={c.refs.join(' · ')}>
-                      {c.refs.map((r) => (
-                        <span key={r} className={refClass(r)}>
-                          {r.replace('tag: ', '')}
-                        </span>
-                      ))}
-                    </span>
-                  )}
+                  <span
+                    className="refs"
+                    style={{
+                      flex: `0 0 ${refsW}px`,
+                      width: refsW,
+                      maxWidth: refsW,
+                      minWidth: refsW,
+                    }}
+                    title={c.refs.join(' · ')}
+                  >
+                    {c.refs.map((r) => (
+                      <span key={r} className={refClass(r)}>
+                        {r.replace('tag: ', '')}
+                      </span>
+                    ))}
+                  </span>
                   <span className="subject" title={c.subject}>
                     {c.subject}
                   </span>
