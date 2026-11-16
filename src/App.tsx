@@ -14,6 +14,7 @@ import { ToastHost } from './features/ToastHost';
 import { QuickSwitch } from './features/QuickSwitch';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { flipTheme } from './ui/theme';
+import { SettingsDialog } from './features/SettingsDialog';
 
 const LEFT_KEY = 'gitdesk.leftWidth';
 const LEFT_MIN = 190;
@@ -37,6 +38,8 @@ export default function App() {
   const setBottomPanel = useStore((s) => s.setBottomPanel);
   const refresh = useStore((s) => s.refresh);
   const pickRepo = useStore((s) => s.pickRepo);
+  const selectAllFiles = useStore((s) => s.selectAllFiles);
+  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const theme = useStore((s) => s.theme);
   const setTheme = useStore((s) => s.setTheme);
   const ongoing = useStore((s) => s.ongoing);
@@ -70,6 +73,42 @@ export default function App() {
     }
   }, [leftW]);
 
+  /**
+   * 最后一次鼠标按下的坐标。
+   * 不能存元素引用：差异视图重渲染会换掉 DOM 节点，引用立刻失效（踩过一次）。
+   */
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const onDown = (ev: MouseEvent) => {
+      lastPointerRef.current = { x: ev.clientX, y: ev.clientY };
+    };
+    document.addEventListener('mousedown', onDown, true);
+    return () => document.removeEventListener('mousedown', onDown, true);
+  }, []);
+
+  /** 找「光标所在的差异面板」：先看最后点击位置，再看焦点，最后看选区锚点 */
+  const findSelectRegion = (): HTMLElement | null => {
+    const bySelector = (el: Element | null): HTMLElement | null =>
+      (el?.closest?.('[data-select-region]') as HTMLElement | null) ?? null;
+
+    const pt = lastPointerRef.current;
+    if (pt) {
+      const hit = bySelector(document.elementFromPoint(pt.x, pt.y));
+      if (hit) return hit;
+    }
+    const active = bySelector(document.activeElement);
+    if (active) return active;
+    const sel = window.getSelection();
+    const anchor = sel?.anchorNode ?? null;
+    if (anchor) {
+      const el = anchor.nodeType === 1 ? (anchor as Element) : anchor.parentElement;
+      const hit = bySelector(el);
+      if (hit) return hit;
+    }
+    return null;
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
@@ -88,6 +127,32 @@ export default function App() {
       } else if (mod && e.shiftKey && e.key.toLowerCase() === 'l') {
         e.preventDefault();
         setTheme(flipTheme(theme));
+      } else if (mod && e.key === ',') {
+        e.preventDefault();
+        setSettingsOpen(true);
+      } else if (mod && e.key.toLowerCase() === 'a') {
+        // 以前这里会把整个页面选蓝（WebView 默认行为）。
+        // 输入框/可编辑区域交还给浏览器（选中输入内容），其它地方只全选文件列表。
+        const t = e.target as HTMLElement | null;
+        const typing =
+          !!t &&
+          (t.tagName === 'INPUT' ||
+            t.tagName === 'TEXTAREA' ||
+            t.tagName === 'SELECT' ||
+            t.isContentEditable);
+        if (typing) return;
+        e.preventDefault();
+        // 光标在差异面板里 → 全选这段差异文本（方便 Ctrl+C 拷出去）
+        const region = findSelectRegion();
+        if (region) {
+          const range = document.createRange();
+          range.selectNodeContents(region);
+          const sel = window.getSelection();
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+          return;
+        }
+        selectAllFiles();
       } else if (e.key === 'Escape' && bottomPanel !== 'none') {
         setBottomPanel(bottomPanel);
       }
@@ -103,6 +168,8 @@ export default function App() {
     setTheme,
     quickSwitchOpen,
     setQuickSwitch,
+    selectAllFiles,
+    setSettingsOpen,
   ]);
 
   const startDragLeft = (e: React.MouseEvent) => {
@@ -279,6 +346,7 @@ export default function App() {
         <DiffModal />
         <CredentialDialog />
         <ModalHost />
+        <SettingsDialog />
         <QuickSwitch />
 
         {error && (

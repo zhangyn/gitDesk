@@ -13,6 +13,16 @@ import { dirname, join } from 'node:path';
 
 import { parseLog } from '../src/parse/log';
 import { currentRefOf, graphRevs, isInGraph, togglePicked } from '../src/git/revFilter';
+import {
+  APPEARANCE_DEFAULT,
+  FONT_SIZE_MAX,
+  FONT_SIZE_MIN,
+  ROW_GAP_MAX,
+  ROW_GAP_MIN,
+  normalizeAppearance,
+  rowHeightDenseOf,
+  rowHeightOf,
+} from '../src/ui/appearance';
 
 const BASE = ['-c', 'core.quotepath=false', '-c', 'color.ui=false'];
 const FORMAT =
@@ -300,6 +310,37 @@ try {
     tryGit(['rev-parse', '--verify', '--quiet', 'no-such-branch^{commit}']).code,
     1,
   );
+  /* ------------------------------ 外观设置（字号 / 行距） */
+  {
+    eq('外观：默认 14px + 18px 间距 = 32px 行高', rowHeightOf(APPEARANCE_DEFAULT), 32);
+    eq('外观：字号越界夹紧（上限）', normalizeAppearance({ fontSize: 99 }).fontSize, FONT_SIZE_MAX);
+    eq('外观：字号越界夹紧（下限）', normalizeAppearance({ fontSize: 1 }).fontSize, FONT_SIZE_MIN);
+    eq('外观：行距越界夹紧', normalizeAppearance({ rowGap: 999 }).rowGap, ROW_GAP_MAX);
+    eq('外观：行距负数夹到下限', normalizeAppearance({ rowGap: -5 }).rowGap, ROW_GAP_MIN);
+    eq('外观：null → 默认', normalizeAppearance(null), APPEARANCE_DEFAULT);
+    eq(
+      '外观：非数字回落默认',
+      normalizeAppearance({ fontSize: 'big' as unknown as number }).fontSize,
+      14,
+    );
+    eq('外观：小数取整', normalizeAppearance({ fontSize: 15.6 }).fontSize, 16);
+    eq('外观：行高 = 字号 + 间距', rowHeightOf({ fontSize: 18, rowGap: 12 }), 30);
+    eq('外观：行高有保底（不切字）', rowHeightOf({ fontSize: 11, rowGap: 2 }), 19);
+    eq('外观：缺字段用默认补齐', normalizeAppearance({ fontSize: 16 }), {
+      fontSize: 16,
+      rowGap: 18,
+    });
+    eq('外观：默认紧凑行高（侧栏）', rowHeightDenseOf(APPEARANCE_DEFAULT), 26);
+    eq('外观：紧凑行高随设置变大', rowHeightDenseOf({ fontSize: 18, rowGap: 26 }), 38);
+    eq(
+      '外观：紧凑行高低于主行高（默认设置）',
+      rowHeightDenseOf(APPEARANCE_DEFAULT) < rowHeightOf(APPEARANCE_DEFAULT),
+      true,
+    );
+    // 字号拉到最大、行距拉到最小时，紧凑行高不能让文字溢出
+    eq('外观：紧凑行高有下限（不切字）', rowHeightDenseOf({ fontSize: 20, rowGap: 2 }), 35);
+  }
+
   /* -------------------------- 提交图 ref 过滤（默认只看当前分支） */
   {
     eq('默认：只用当前分支（不加 --branches）', graphRevs(null, 'local'), ['--tags', 'HEAD']);

@@ -1,5 +1,6 @@
 import type { GraphRow } from './layout';
 
+/** 默认行高；实际值由「外观设置」决定，调用方通过 rowHeight 传入 */
 export const ROW_HEIGHT = 32;
 /** 泳道基准宽度（泳道少时用它） */
 export const LANE_WIDTH = 13;
@@ -73,10 +74,13 @@ export function drawGraph(
     scrollTop: number;
     selectedIndex: number;
     hoverIndex: number;
+    /** 行高（px）；不传用 ROW_HEIGHT。必须和 DOM 里 .commit-row 的高度一致 */
+    rowHeight?: number;
   },
 ): void {
   const dpr = window.devicePixelRatio || 1;
   const { width, graphWidth, viewportHeight, scrollTop } = opts;
+  const ROW_HEIGHT = opts.rowHeight ?? 32;
 
   canvas.width = Math.max(1, Math.floor(width * dpr));
   canvas.height = Math.max(1, Math.floor(viewportHeight * dpr));

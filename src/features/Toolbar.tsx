@@ -144,6 +144,7 @@ export function Toolbar() {
   const setLogScope = useStore((s) => s.setLogScope);
   const centerLayout = useStore((s) => s.centerLayout);
   const setCenterLayout = useStore((s) => s.setCenterLayout);
+  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const theme = useStore((s) => s.theme);
   const setTheme = useStore((s) => s.setTheme);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -375,6 +376,10 @@ export function Toolbar() {
           hint={centerLayout === 'stacked' ? '当前' : undefined}
         >
           经典三行（文件 / 差异 / 图）
+        </MenuItem>
+        <MenuSep />
+        <MenuItem onClick={() => setSettingsOpen(true)} hint="Ctrl+,">
+          外观设置（字号 / 行间距）…
         </MenuItem>
       </Popover>
 

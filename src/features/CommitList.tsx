@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
-import { drawGraph, graphWidthFor, ROW_HEIGHT } from './graph/drawGraph';
+import { drawGraph, graphWidthFor } from './graph/drawGraph';
+import { rowHeightOf } from '../ui/appearance';
 import { copyText } from '../ui/clipboard';
 import { ContextMenu, type CtxItem } from '../ui/ContextMenu';
 import { promptBox } from '../ui/dialog';
@@ -197,6 +198,9 @@ export function CommitList() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const loadingMoreRef = useRef(false);
+  const appearance = useStore((st) => st.appearance);
+  /** 行高随「外观设置」变化：DOM 行与 Canvas 泳道必须用同一个值 */
+  const rowH = rowHeightOf(appearance);
   const [refsW, setRefsW] = useState(loadRefsWidth);
 
   const persistRefsW = useCallback((v: number) => {
@@ -282,7 +286,7 @@ export function CommitList() {
     () => (selectedSha ? graph.findIndex((r) => r.sha === selectedSha) : -1),
     [graph, selectedSha],
   );
-  const rowsHeight = Math.max(ROW_HEIGHT, graph.length * ROW_HEIGHT);
+  const rowsHeight = Math.max(rowH, graph.length * rowH);
   const innerHeight = rowsHeight + (hasMore ? MORE_BAR_HEIGHT : 0);
 
   /** 上下移动选中项（键盘用），顺手把它滚进可视区 */
@@ -298,8 +302,8 @@ export function CommitList() {
         const el = scrollRef.current;
         if (!el) return;
         // 行是虚拟化的：目标行可能没渲染，直接算 scrollTop 把它居中
-        const top = next * ROW_HEIGHT;
-        const view = el.clientHeight - ROW_HEIGHT;
+        const top = next * rowH;
+        const view = el.clientHeight - rowH;
         const target =
           top < el.scrollTop
             ? Math.max(0, top - view / 2)
@@ -309,7 +313,7 @@ export function CommitList() {
         if (target !== el.scrollTop) el.scrollTop = target;
       });
     },
-    [graph, selectedIndex, openCommit, rowsHeight],
+    [graph, selectedIndex, openCommit, rowsHeight, rowH],
   );
 
   const onKeyDown = useCallback(
@@ -363,23 +367,24 @@ export function CommitList() {
         scrollTop,
         selectedIndex,
         hoverIndex: hoverRef.current,
+        rowHeight: rowH,
       });
     };
     redrawRef.current = draw;
     draw();
-  }, [graph, width, viewWidth, viewHeight, scrollTop, selectedIndex]);
+  }, [graph, width, viewWidth, viewHeight, scrollTop, selectedIndex, rowH]);
 
   /** 鼠标移动 → 算出行号 → 变了才重绘 canvas（不走 React state，避免整列 reconcile） */
   const onMouseMove = useCallback(
     (e: React.MouseEvent) => {
       const rect = e.currentTarget.getBoundingClientRect();
-      const idx = Math.floor((e.clientY - rect.top + scrollTop) / ROW_HEIGHT);
+      const idx = Math.floor((e.clientY - rect.top + scrollTop) / rowH);
       if (idx !== hoverRef.current) {
         hoverRef.current = idx;
         redrawRef.current();
       }
     },
-    [scrollTop],
+    [scrollTop, rowH],
   );
 
   const onMouseLeave = useCallback(() => {
@@ -461,10 +466,10 @@ export function CommitList() {
 
   // DOM 行虚拟化：只渲染视口内（±OVERSCAN）的行。
   // canvas 已经按视口裁剪，DOM 也要跟上——否则几千行时每次滚动都要 reconcile 全部行。
-  const firstRow = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
+  const firstRow = Math.max(0, Math.floor(scrollTop / rowH) - OVERSCAN);
   const lastRow = Math.min(
     graph.length,
-    Math.ceil((scrollTop + Math.max(viewHeight, 1)) / ROW_HEIGHT) + OVERSCAN,
+    Math.ceil((scrollTop + Math.max(viewHeight, 1)) / rowH) + OVERSCAN,
   );
   const visibleRows = graph.slice(firstRow, lastRow);
 
@@ -508,7 +513,7 @@ export function CommitList() {
                 <div
                   key={`${row.sha}-${i}`}
                   className={`commit-row${i === selectedIndex ? ' is-selected' : ''}`}
-                  style={{ top: i * ROW_HEIGHT, paddingLeft: width + 6 }}
+                  style={{ top: i * rowH, paddingLeft: width + 6 }}
                   onClick={() => void openCommit(c.sha)}
                   onContextMenu={(e) => openCtx(e, c.sha, c.subject)}
                 >

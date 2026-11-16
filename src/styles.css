@@ -1,4 +1,8 @@
 :root {
+  /* 外观设置（设置面板可调）：全站字号与列表行高都从这里派生 */
+  --fs-base: 14px;
+  --row-h: 32px;
+  --row-h-sm: 23px;
   --bg: #0d1117;
   --bg-soft: #12161d;
   --bg-panel: #161b22;
@@ -58,7 +62,7 @@ body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--sans);
-  font-size: 14px;
+  font-size: var(--fs-base);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
@@ -154,7 +158,7 @@ body.is-resizing {
   border-bottom: 1px solid var(--border-soft);
   background: var(--bg-panel);
   color: var(--fg-dim);
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
   font-weight: 600;
   flex: 0 0 auto;
   min-width: 0;
@@ -168,14 +172,14 @@ body.is-resizing {
 .pane-head .hint {
   color: var(--dim-2);
   font-weight: 400;
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
   white-space: nowrap;
 }
 
 .pane-head .meta-item {
   color: var(--muted);
   font-weight: 400;
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   white-space: nowrap;
 }
 
@@ -185,7 +189,7 @@ body.is-resizing {
 }
 
 .pane-head .commit-subject {
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
   font-weight: 600;
   color: var(--fg);
   overflow: hidden;
@@ -196,7 +200,7 @@ body.is-resizing {
 
 .pane-head .sha {
   color: var(--accent);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
   flex: 0 0 auto;
 }
 
@@ -264,7 +268,7 @@ body.is-resizing {
 }
 
 .tb-btn.icon {
-  font-size: 14px;
+  font-size: var(--fs-base);
   padding: 0 7px;
 }
 
@@ -274,7 +278,7 @@ body.is-resizing {
   border-radius: 999px;
   background: var(--bg-raised);
   color: var(--accent);
-  font-size: 11px;
+  font-size: calc(var(--fs-base) * 0.7857);
   font-family: var(--mono);
   line-height: 14px;
   text-align: center;
@@ -322,7 +326,7 @@ body.is-resizing {
 
 .caret {
   color: var(--muted);
-  font-size: 10px;
+  font-size: calc(var(--fs-base) * 0.7143);
 }
 
 .caret-btn {
@@ -337,7 +341,7 @@ body.is-resizing {
   border-radius: 999px;
   background: var(--bg-raised);
   border: 1px solid var(--border);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   color: var(--accent);
   flex: 0 1 auto;
   min-width: 80px;
@@ -360,19 +364,19 @@ body.is-resizing {
 .ab-ahead {
   color: var(--accent-2);
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
 }
 
 .ab-behind {
   color: var(--warn);
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
 }
 
 .remote-name {
   flex: 0 0 auto;
   color: var(--fg-dim);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   font-family: var(--mono);
   max-width: 110px;
   overflow: hidden;
@@ -394,7 +398,7 @@ body.is-resizing {
     no-repeat right 5px center;
   color: var(--fg-dim);
   font-family: var(--sans);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   outline: none;
   cursor: pointer;
 }
@@ -405,7 +409,7 @@ body.is-resizing {
   border: 1px solid var(--border);
   background: var(--bg-raised);
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
 }
 
 .pill.warn {
@@ -455,7 +459,7 @@ body.is-resizing {
 .menu-title {
   padding: 6px 9px 3px;
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
@@ -471,7 +475,7 @@ body.is-resizing {
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--fg);
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
   outline: none;
 }
 
@@ -489,7 +493,7 @@ body.is-resizing {
   border-radius: 5px;
   color: var(--fg-dim);
   text-align: left;
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
 }
 
 .menu-item:hover:not(:disabled) {
@@ -539,7 +543,7 @@ body.is-resizing {
 
 .menu-repo-path {
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   font-family: var(--mono);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -551,14 +555,14 @@ body.is-resizing {
 .menu-hint {
   margin-left: auto;
   color: var(--dim-2);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   font-family: var(--mono);
 }
 
 .menu-empty {
   padding: 10px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
   text-align: center;
 }
 
@@ -590,7 +594,7 @@ body.is-resizing {
   gap: 5px;
   padding: 7px 12px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
   font-weight: 600;
   border-bottom: 2px solid transparent;
 }
@@ -610,7 +614,7 @@ body.is-resizing {
   border-radius: 999px;
   background: var(--bg-raised);
   color: var(--accent);
-  font-size: 11px;
+  font-size: calc(var(--fs-base) * 0.7857);
   font-family: var(--mono);
   line-height: 14px;
   text-align: center;
@@ -648,7 +652,7 @@ body.is-resizing {
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--fg);
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
   outline: none;
 }
 
@@ -663,6 +667,8 @@ body.is-resizing {
   display: flex;
   align-items: center;
   width: 100%;
+  /* 文件列表行距跟随「外观设置」（min-height：小字号时不切内容） */
+  min-height: var(--row-h);
 }
 
 .chg-row.is-active {
@@ -717,7 +723,7 @@ body.is-resizing {
   justify-content: center;
   border-radius: 3px;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: calc(var(--fs-base) * 0.7857);
   font-weight: 700;
   line-height: 1;
 }
@@ -759,7 +765,7 @@ body.is-resizing {
 .chg-path {
   display: flex;
   min-width: 0;
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
   color: var(--fg-dim);
   overflow: hidden;
 }
@@ -782,7 +788,7 @@ body.is-resizing {
   flex: 0 0 auto;
   padding-right: 8px;
   color: var(--danger);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
 }
 
 .row-actions {
@@ -807,7 +813,7 @@ body.is-resizing {
   justify-content: center;
   border-radius: 4px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
   line-height: 1;
 }
 
@@ -846,7 +852,7 @@ body.is-resizing {
   min-width: 0;
   padding: 6px 8px;
   color: var(--fg-dim);
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
   font-weight: 600;
 }
 
@@ -862,7 +868,7 @@ body.is-resizing {
   display: inline-block;
   width: 9px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: calc(var(--fs-base) * 0.7143);
   transition: transform 0.12s;
 }
 
@@ -876,7 +882,7 @@ body.is-resizing {
   border-radius: 999px;
   background: var(--bg-raised);
   color: var(--muted);
-  font-size: 11px;
+  font-size: calc(var(--fs-base) * 0.7857);
   font-family: var(--mono);
   text-align: center;
 }
@@ -884,7 +890,9 @@ body.is-resizing {
 .ref-row {
   display: flex;
   align-items: center;
-  font-size: 13.5px;
+  /* 行距跟随「外观设置」；用 min-height 保证极端小值时不切字 */
+  min-height: var(--row-h-sm);
+  font-size: calc(var(--fs-base) * 0.9643);
   color: var(--fg-dim);
 }
 
@@ -919,14 +927,14 @@ body.is-resizing {
   border-radius: 3px;
   background: var(--accent-2);
   color: var(--bg);
-  font-size: 10.5px;
+  font-size: calc(var(--fs-base) * 0.75);
   font-family: var(--mono);
 }
 
 .stash-ref {
   margin-left: auto;
   color: var(--dim-2);
-  font-size: 11px;
+  font-size: calc(var(--fs-base) * 0.7857);
   padding-left: 6px;
 }
 
@@ -1001,12 +1009,12 @@ body.is-resizing {
   position: absolute;
   left: 0;
   right: 0;
-  height: 32px;
+  height: var(--row-h);
   display: flex;
   align-items: center;
   gap: 7px;
   padding-right: 10px;
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
   cursor: default;
   white-space: nowrap;
 }
@@ -1031,14 +1039,14 @@ body.is-resizing {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   text-align: right;
 }
 
 .commit-row .date {
   flex: 0 0 78px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
   font-family: var(--mono);
   text-align: right;
 }
@@ -1046,7 +1054,7 @@ body.is-resizing {
 .commit-row .sha {
   flex: 0 0 54px;
   color: var(--dim-2);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   text-align: right;
 }
 
@@ -1083,7 +1091,7 @@ body.is-resizing {
 .badge {
   padding: 0 5px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: calc(var(--fs-base) * 0.7857);
   font-family: var(--mono);
   line-height: 16px;
   white-space: nowrap;
@@ -1156,7 +1164,7 @@ body.is-resizing {
   border: 1px solid var(--border);
   background: var(--bg-raised);
   color: var(--fg-dim);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   white-space: nowrap;
   flex: 0 0 auto;
   max-width: 300px;
@@ -1181,14 +1189,14 @@ body.is-resizing {
 .chip-file .st {
   width: auto;
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: calc(var(--fs-base) * 0.7857);
 }
 
 .st {
   width: 26px;
   flex: 0 0 26px;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
 }
 
 .st.add {
@@ -1218,7 +1226,7 @@ body.is-resizing {
   white-space: nowrap;
   color: var(--fg);
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   font-weight: 400;
 }
 
@@ -1235,7 +1243,7 @@ body.is-resizing {
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   color: var(--muted);
   background: var(--bg-raised);
 }
@@ -1251,7 +1259,7 @@ body.is-resizing {
 
 .seg-count {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: calc(var(--fs-base) * 0.7143);
 }
 
 /* ============================== diff ============================== */
@@ -1268,12 +1276,12 @@ body.is-resizing {
 
 .diff-actions .selinfo {
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
 }
 
 .hint-inline {
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   padding-left: 4px;
 }
 
@@ -1282,7 +1290,7 @@ body.is-resizing {
   overflow: auto;
   min-height: 0;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
   line-height: 18px;
 }
 
@@ -1340,7 +1348,7 @@ body.is-resizing {
 .selbox {
   flex: 0 0 13px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: calc(var(--fs-base) * 0.7857);
   text-align: center;
   user-select: none;
 }
@@ -1366,7 +1374,7 @@ body.is-resizing {
   padding-right: 7px;
   color: var(--dim-1);
   user-select: none;
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
 }
 
 .dl .sign {
@@ -1427,14 +1435,14 @@ body.is-resizing {
   justify-content: center;
   flex: 1 1 auto;
   color: var(--muted);
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
   padding: 22px;
   text-align: center;
 }
 
 .diff-empty.small {
   padding: 9px 11px;
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   flex: 0 0 auto;
   justify-content: flex-start;
 }
@@ -1460,14 +1468,14 @@ body.is-resizing {
 }
 
 .bp-title {
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
   font-weight: 600;
   color: var(--fg);
 }
 
 .bp-sub {
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1484,7 +1492,7 @@ body.is-resizing {
 
 .bp-foot .hint {
   color: var(--dim-2);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
 }
 
 .commit-panel {
@@ -1502,7 +1510,7 @@ body.is-resizing {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
   line-height: 1.55;
   outline: none;
 }
@@ -1517,7 +1525,7 @@ body.is-resizing {
   align-items: center;
   gap: 4px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   cursor: pointer;
   user-select: none;
 }
@@ -1539,7 +1547,7 @@ body.is-resizing {
   align-items: center;
   gap: 8px;
   padding: 1px 10px;
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   color: var(--fg-dim);
   white-space: nowrap;
 }
@@ -1586,7 +1594,7 @@ body.is-resizing {
 
 .link {
   color: var(--accent);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
   flex: 0 0 auto;
 }
 
@@ -1619,14 +1627,14 @@ body.is-resizing {
 
 .welcome-brand h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: calc(var(--fs-base) * 1.7143);
   letter-spacing: 0.3px;
 }
 
 .welcome-brand p {
   margin: 3px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
 }
 
 .logo {
@@ -1654,7 +1662,7 @@ body.is-resizing {
 .big-btn {
   align-self: flex-start;
   padding: 8px 16px;
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 .welcome-list-head {
@@ -1663,7 +1671,7 @@ body.is-resizing {
   gap: 7px;
   margin-top: 8px;
   color: var(--fg-dim);
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
   font-weight: 600;
 }
 
@@ -1711,7 +1719,7 @@ body.is-resizing {
 
 .repo-card-path {
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1721,7 +1729,7 @@ body.is-resizing {
 
 .repo-card-date {
   color: var(--dim-2);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   font-family: var(--mono);
   flex: 0 0 auto;
 }
@@ -1733,7 +1741,7 @@ body.is-resizing {
   background: var(--err-bg);
   border: 1px solid var(--err-border);
   color: var(--err-fg);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   font-family: var(--mono);
   white-space: pre-wrap;
 }
@@ -1759,12 +1767,12 @@ body.is-resizing {
 .conflict-title {
   font-weight: 600;
   color: var(--warn);
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
 }
 
 .conflict-head .path {
   color: var(--fg-dim);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1775,7 +1783,7 @@ body.is-resizing {
   background: rgba(210, 153, 34, 0.12);
   border-bottom: 1px solid rgba(210, 153, 34, 0.25);
   color: var(--warn);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   line-height: 1.5;
 }
 
@@ -1816,7 +1824,7 @@ body.is-resizing {
   gap: 8px;
   padding: 4px 9px;
   border-bottom: 1px solid var(--border-soft);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   color: var(--fg-dim);
 }
 
@@ -1826,7 +1834,7 @@ body.is-resizing {
 }
 
 .cblock-state {
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
 }
 
 .cblock-state.ok {
@@ -1854,7 +1862,7 @@ body.is-resizing {
   align-items: center;
   gap: 6px;
   padding: 3px 8px;
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   font-family: var(--mono);
   border-bottom: 1px solid var(--border-soft);
 }
@@ -1878,7 +1886,7 @@ body.is-resizing {
   margin: 0;
   padding: 6px 8px;
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-all;
@@ -1912,7 +1920,7 @@ body.is-resizing {
 
 .conflict-foot .hint {
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
 }
 
 /* ============================== 通用控件 ============================== */
@@ -1963,7 +1971,7 @@ body.is-resizing {
 
 .btn.small {
   padding: 3px 8px;
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
 }
 
 .empty-hint {
@@ -1972,7 +1980,7 @@ body.is-resizing {
   justify-content: center;
   flex: 1 1 auto;
   color: var(--muted);
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
   padding: 20px;
   text-align: center;
 }
@@ -1980,7 +1988,7 @@ body.is-resizing {
 .empty-hint.small {
   padding: 7px 16px;
   justify-content: flex-start;
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   color: var(--dim-2);
 }
 
@@ -2005,7 +2013,7 @@ body.is-resizing {
 .error-text {
   white-space: pre-wrap;
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   line-height: 1.5;
   max-height: 40vh;
   overflow: auto;
@@ -2020,7 +2028,7 @@ body.is-resizing {
   background: var(--bg-raised);
   border: 1px solid var(--border);
   color: var(--accent);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   z-index: 60;
 }
 
@@ -2045,14 +2053,14 @@ body.is-resizing {
 }
 
 .modal-title {
-  font-size: 15px;
+  font-size: calc(var(--fs-base) * 1.0714);
   font-weight: 600;
   margin-bottom: 8px;
 }
 
 .modal-body {
   color: var(--fg-dim);
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
   line-height: 1.6;
   white-space: pre-wrap;
 }
@@ -2060,7 +2068,7 @@ body.is-resizing {
 .modal-label {
   margin: 10px 0 5px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
 }
 
 .modal-input {
@@ -2071,7 +2079,7 @@ body.is-resizing {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--mono);
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
   outline: none;
 }
 
@@ -2109,7 +2117,7 @@ body.is-resizing {
 }
 
 .changes-head {
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
 }
 
 .changes-head-title {
@@ -2179,7 +2187,7 @@ body.is-resizing {
   padding: 3px 6px 3px 11px;
   text-align: left;
   color: var(--fg-dim);
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
 }
 
 .repo-item-main:hover:not(:disabled) {
@@ -2208,7 +2216,7 @@ body.is-resizing {
 .repo-close {
   margin: 4px 11px 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
   text-align: left;
 }
 
@@ -2219,7 +2227,7 @@ body.is-resizing {
 
 /* 分栏 diff */
 .diff.is-split {
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
 }
 
 .dsp-row {
@@ -2244,7 +2252,7 @@ body.is-resizing {
   padding-right: 6px;
   color: var(--dim-1);
   user-select: none;
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
 }
 
 .dsp-cell .sign {
@@ -2315,13 +2323,13 @@ body.is-resizing {
   padding: 1px 10px;
   color: var(--muted);
   font-style: italic;
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
 }
 
 /* 文件头：两侧语义 + 视图切换 */
 .sides-label {
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   white-space: nowrap;
   flex: 0 0 auto;
   margin-left: 2px;
@@ -2357,7 +2365,7 @@ body.is-resizing {
   background: var(--bg-panel);
   border-top: 1px solid var(--border);
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
   flex: 0 0 auto;
 }
 
@@ -2377,7 +2385,7 @@ body.is-resizing {
 
 .sb-item {
   white-space: nowrap;
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   color: var(--fg-dim);
 }
 
@@ -2412,7 +2420,7 @@ body.is-resizing {
   padding: 1px 6px;
   border-radius: 4px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
 }
 
 .sb-btn:hover {
@@ -2489,7 +2497,7 @@ body.is-resizing-x {
   border: 1px solid transparent;
   border-bottom: none;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   font-weight: 600;
   white-space: nowrap;
   flex: 0 0 auto;
@@ -2530,7 +2538,7 @@ body.is-resizing-x {
   align-items: center;
   justify-content: center;
   border-radius: 3px;
-  font-size: 10px;
+  font-size: calc(var(--fs-base) * 0.7143);
   color: var(--muted);
 }
 
@@ -2586,13 +2594,13 @@ body.is-resizing-x {
   padding: 4px 10px;
   border-top: 1px solid var(--border-soft);
   background: var(--bg-panel);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
   color: var(--muted);
   flex: 0 0 auto;
 }
 
 .diff-modal .diff {
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
   line-height: 19px;
 }
 
@@ -2744,7 +2752,7 @@ body.is-resizing-x {
   gap: 4px;
   margin-left: 5px;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   flex: 0 0 auto;
 }
 
@@ -2759,7 +2767,7 @@ body.is-resizing-x {
 .tr-gone {
   color: var(--danger);
   font-family: var(--sans);
-  font-size: 11px;
+  font-size: calc(var(--fs-base) * 0.7857);
 }
 
 /* 远程分支行：可双击检出 */
@@ -2794,14 +2802,14 @@ body.is-resizing-x {
 }
 
 .ob-title {
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
   font-weight: 600;
   color: var(--warn);
   text-transform: capitalize;
 }
 
 .ob-sub {
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   color: var(--fg-dim);
 }
 
@@ -2820,7 +2828,7 @@ body.is-resizing-x {
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--fg);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   font-weight: 400;
   outline: none;
 }
@@ -2850,7 +2858,7 @@ body.is-resizing-x {
 .cmp-label {
   flex: 0 0 84px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
 }
 
 .cmp-row .modal-input {
@@ -2889,7 +2897,7 @@ body.is-resizing-x {
   border-bottom: 1px solid var(--border-soft);
   color: var(--dim-2);
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   user-select: none;
 }
 
@@ -2912,14 +2920,14 @@ body.is-resizing-x {
   padding: 0 5px;
   color: var(--muted);
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   font-weight: 400;
 }
 
 .hunk-nav .icon-btn {
   width: 17px;
   height: 17px;
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
 }
 
 /* 行内（word-level）差异高亮 */
@@ -2956,12 +2964,12 @@ body.is-resizing-x {
 /* 状态格：两列宽度恒定，空格子给一个淡点，避免暂存/取消暂存时文件名左右跳 */
 .chip-empty {
   color: var(--dim-3);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
 }
 
 .chips-legend {
   color: var(--dim-2);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   font-weight: 400;
   white-space: nowrap;
 }
@@ -2982,7 +2990,7 @@ body.is-resizing-x {
   background: var(--bg-raised);
   border: 1px solid var(--border-soft);
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
   line-height: 1.6;
 }
 
@@ -3003,7 +3011,7 @@ body.is-resizing-x {
   border: 1px solid var(--border);
   background: var(--bg-raised);
   color: var(--fg-dim);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   font-family: var(--sans);
   /* 常驻但淡显：藏到 hover 后面等于没有（用户根本发现不了这个能力） */
   opacity: 0.55;
@@ -3031,7 +3039,7 @@ body.is-resizing-x {
 
 .picked-count {
   color: var(--accent);
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -3042,7 +3050,7 @@ body.is-resizing-x {
   padding: 7px 11px;
   border-bottom: 1px solid var(--border-soft);
   color: var(--fg-dim);
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
   line-height: 1.65;
   max-height: 40%;
   overflow-y: auto;
@@ -3061,14 +3069,14 @@ body.is-resizing-x {
   white-space: pre-wrap;
   word-break: break-word;
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
 }
 
 .cb-more {
   display: inline-block;
   margin-top: 4px;
   color: var(--accent);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
 }
 
 /* 列表获得焦点时的可见提示（只在键盘操作时出现） */
@@ -3126,7 +3134,7 @@ body.is-resizing-x {
   padding: 8px 14px;
   margin: 4px 0;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   background: color-mix(in srgb, var(--border) 25%, transparent);
   border-top: 1px dashed var(--border);
   border-bottom: 1px dashed var(--border);
@@ -3139,7 +3147,7 @@ body.is-resizing-x {
   border: none;
   background: transparent;
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
   line-height: 1;
   padding: 3px 5px;
   border-radius: 4px;
@@ -3169,7 +3177,7 @@ body.is-resizing-x {
   align-items: center;
   gap: 7px;
   padding: 6px 12px 8px;
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   color: var(--muted);
   cursor: pointer;
   user-select: none;
@@ -3185,7 +3193,7 @@ body.is-resizing-x {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11.5px;
+  font-size: calc(var(--fs-base) * 0.8214);
   color: var(--muted);
 }
 
@@ -3254,7 +3262,7 @@ body.is-resizing-x {
 
 .cd-files-title {
   padding: 5px 10px;
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
   color: var(--muted);
   border-bottom: 1px solid var(--border);
   position: sticky;
@@ -3267,7 +3275,7 @@ body.is-resizing-x {
   align-items: center;
   gap: 8px;
   padding: 4px 10px;
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
 }
 
 .cd-file:hover {
@@ -3283,13 +3291,13 @@ body.is-resizing-x {
 
 .cd-hint {
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: calc(var(--fs-base) * 0.7857);
   color: var(--muted);
 }
 
 .cd-empty {
   padding: 10px;
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   color: var(--muted);
 }
 
@@ -3352,40 +3360,40 @@ body.is-resizing-x {
   height: 30px;
   padding: 0 11px;
   gap: 5px;
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
 }
 
 /* 图标按钮：19px 偏小（左栏区块右上角的 +/✕ 就是它），统一放大到 24px */
 .icon-btn {
   width: 24px;
   height: 24px;
-  font-size: 14px;
+  font-size: var(--fs-base);
   border-radius: 5px;
 }
 
 /* 主/次按钮 */
 .btn {
   padding: 6px 14px;
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
 }
 
 .btn.small {
   padding: 4px 11px;
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
 }
 
 /* 状态字母 chip */
 .chip {
   width: 17px;
   height: 18px;
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
 }
 
 /* 面板标题条 */
 .pane-head {
   height: 34px;
   padding: 0 11px;
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
 }
 
 .files-head {
@@ -3401,19 +3409,19 @@ body.is-resizing-x {
 .statusbar {
   height: 28px;
   padding: 0 11px;
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
 }
 
 /* 菜单项 */
 .menu-item {
   padding: 7px 11px;
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 /* 下拉选择 */
 .mini-select {
   padding: 4px 20px 4px 8px;
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
 }
 
 /* 左栏列表行：更松 */
@@ -3429,23 +3437,23 @@ body.is-resizing-x {
 
 .ref-row,
 .chg-row {
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 .repo-item-main {
   padding: 4px 6px 4px 11px;
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 /* 区块标题 */
 .section-head {
   padding: 7px 8px;
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
 }
 
 /* diff 文本：字号/行距放宽，长时间看更舒服 */
 .diff {
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
   line-height: 20px;
 }
 
@@ -3469,7 +3477,7 @@ body.is-resizing-x {
   border: 1px solid var(--border);
   background: var(--bg-raised);
   color: var(--fg-dim);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
   cursor: default;
   animation: toast-in 0.16s ease-out;
@@ -3511,7 +3519,7 @@ body.is-resizing-x {
 }
 
 .eb-title {
-  font-size: 16px;
+  font-size: calc(var(--fs-base) * 1.1429);
   font-weight: 600;
 }
 
@@ -3525,7 +3533,7 @@ body.is-resizing-x {
   background: var(--bg-panel);
   color: var(--danger);
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: calc(var(--fs-base) * 0.8929);
   white-space: pre-wrap;
 }
 
@@ -3549,7 +3557,7 @@ body.is-resizing-x {
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--fg);
-  font-size: 14px;
+  font-size: var(--fs-base);
   outline: none;
 }
 
@@ -3573,7 +3581,7 @@ body.is-resizing-x {
   padding: 7px 9px;
   border-radius: 6px;
   text-align: left;
-  font-size: 13.5px;
+  font-size: calc(var(--fs-base) * 0.9643);
   color: var(--fg-dim);
 }
 
@@ -3584,7 +3592,7 @@ body.is-resizing-x {
 
 .qs-kind {
   flex: 0 0 auto;
-  font-size: 10.5px;
+  font-size: calc(var(--fs-base) * 0.75);
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 4px;
@@ -3611,7 +3619,7 @@ body.is-resizing-x {
 .qs-sub {
   flex: 0 1 auto;
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(var(--fs-base) * 0.8571);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3621,7 +3629,7 @@ body.is-resizing-x {
   padding: 18px;
   text-align: center;
   color: var(--muted);
-  font-size: 13px;
+  font-size: calc(var(--fs-base) * 0.9286);
 }
 
 /* 同步状态横幅：信息色偏蓝，与「进行中」横幅区分 */
@@ -3645,7 +3653,7 @@ body.is-resizing-x {
   padding: 0 5px;
   border-radius: 4px;
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: calc(var(--fs-base) * 0.75);
 }
 
 .mini-text:hover {
@@ -3663,7 +3671,7 @@ body.is-resizing-x {
   border-bottom: 1px solid var(--border-soft);
   background: var(--bg-panel);
   color: var(--dim-2);
-  font-size: 10.5px;
+  font-size: calc(var(--fs-base) * 0.75);
   flex: 0 0 auto;
   user-select: none;
 }
@@ -3721,4 +3729,72 @@ body.is-resizing-x {
   flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
+}
+
+/* ---------------------------- 外观设置面板 ---------------------------- */
+.settings-modal {
+  width: 470px;
+}
+
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.set-label {
+  flex: 0 0 58px;
+  color: var(--fg-dim);
+  font-size: calc(var(--fs-base) * 0.893);
+}
+
+.set-range {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.set-value {
+  flex: 0 0 56px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: calc(var(--fs-base) * 0.857);
+  color: var(--accent);
+}
+
+.set-preview {
+  margin-top: 16px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-soft);
+}
+
+.set-preview-title {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: calc(var(--fs-base) * 0.786);
+}
+
+.set-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--row-h);
+}
+
+.set-preview-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.set-note {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: calc(var(--fs-base) * 0.786);
+  line-height: 1.5;
 }

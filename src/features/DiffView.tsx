@@ -446,6 +446,7 @@ export function DiffView({
   return (
     <div
       className={`diff${mode === 'split' ? ' is-split' : ''}${wrap ? ' is-wrap' : ''}`}
+      data-select-region="diff"
       ref={containerRef}
     >
       {patches.map((p, pi) => (

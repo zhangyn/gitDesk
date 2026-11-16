@@ -131,6 +131,13 @@ import {
 import { layoutGraph, type GraphRow } from './features/graph/layout';
 import { buildSelectedPatch } from './patch/build';
 import { confirmBox } from './ui/dialog';
+import {
+  applyAppearance,
+  loadAppearance,
+  saveAppearance,
+  normalizeAppearance,
+  type Appearance,
+} from './ui/appearance';
 import { applyTheme, loadTheme, syncWindowTheme, watchSystemTheme } from './ui/theme';
 import { toast } from './stores/toast';
 
@@ -343,7 +350,15 @@ interface AppStore {
   /** Shift 连选的锚点 */
   fileAnchor: string | null;
   pickFile: (path: string, mode: 'single' | 'toggle' | 'range', order?: string[]) => void;
+  /** 全选当前文件列表（Ctrl+A；输入框内不抢） */
+  selectAllFiles: () => void;
   clearPicked: () => void;
+  /** 外观设置：字号 / 行距 */
+  appearance: Appearance;
+  setAppearance: (patch: Partial<Appearance>) => void;
+  resetAppearance: () => void;
+  settingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
   stagePicked: () => Promise<void>;
   unstagePicked: () => Promise<void>;
   /** 行内差异高亮开关 */
@@ -516,6 +531,8 @@ const EMPTY_REPO_STATE = {
   logQuery: null,
   logLimit: LOG_PAGE,
   pickedPaths: [] as string[],
+  appearance: loadAppearance(),
+  settingsOpen: false,
   fileAnchor: null,
   wordDiff: localStorage.getItem('gitdesk.wordDiff') !== '0',
   diffFlags: loadDiffFlags(),
@@ -1156,8 +1173,30 @@ export const useStore = create<AppStore>()((set, get) => {
       });
     },
 
+    selectAllFiles() {
+      const entries = get().status?.entries ?? [];
+      if (entries.length === 0) return;
+      const paths = entries.map((e) => e.path);
+      set({ pickedPaths: paths, fileAnchor: paths[0] ?? null });
+    },
+
     clearPicked() {
       set({ pickedPaths: [], fileAnchor: null });
+    },
+
+    setAppearance(patch) {
+      const next = normalizeAppearance({ ...get().appearance, ...patch });
+      saveAppearance(next);
+      applyAppearance(next);
+      set({ appearance: next });
+    },
+
+    resetAppearance() {
+      get().setAppearance({ ...normalizeAppearance(null) });
+    },
+
+    setSettingsOpen(open) {
+      set({ settingsOpen: open });
     },
 
     async stagePicked() {
