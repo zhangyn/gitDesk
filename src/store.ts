@@ -23,6 +23,7 @@ import {
   setOneShotAuth,
   watcherSuppressed,
 } from './git/runner';
+import { currentRefOf, togglePicked, type GraphPicked } from './git/revFilter';
 import { openRepo } from './git/ops/repo';
 import { getStatus } from './git/ops/status';
 import {
@@ -255,25 +256,26 @@ function saveRecent(list: RepoEntry[]): void {
 
 /* ------------------------------------------- 提交图排除的 ref（按仓库持久化） */
 
-function graphExcludesKey(repoPath: string): string {
+function graphPickedKey(repoPath: string): string {
   return `gitdesk.graphExcludes:${repoPath}`;
 }
 
-function loadGraphExcludes(repoPath: string): string[] {
+/** 返回 null = 从没设置过（默认只看当前分支）；'all' 或 refname 数组 */
+function loadGraphPicked(repoPath: string): GraphPicked {
   try {
-    const raw = localStorage.getItem(graphExcludesKey(repoPath));
-    if (!raw) return [];
+    const raw = localStorage.getItem(graphPickedKey(repoPath));
+    if (!raw) return null;
     const arr = JSON.parse(raw) as unknown;
     if (!Array.isArray(arr)) return [];
     return arr.filter((x): x is string => typeof x === 'string');
   } catch {
-    return [];
+    return null;
   }
 }
 
-function saveGraphExcludes(repoPath: string, list: string[]): void {
+function saveGraphPicked(repoPath: string, value: GraphPicked): void {
   try {
-    localStorage.setItem(graphExcludesKey(repoPath), JSON.stringify(list));
+    localStorage.setItem(graphPickedKey(repoPath), JSON.stringify(value));
   } catch {
     /* 忽略配额错误 */
   }
@@ -310,7 +312,12 @@ interface AppStore {
   stashes: StashEntry[];
   backups: BackupEntry[];
   /** 不参与提交图的完整 refname（refs/heads/x、refs/remotes/o/x）；治多分支泳道爆炸 */
-  excludedRefs: string[];
+  /** 提交图显示哪些分支：null = 只看当前（默认）；'all' = 全部；数组 = 当前 + 勾选的 */
+  graphPicked: GraphPicked;
+  /** 一键：全部参与提交图 */
+  showAllGraphRefs: () => Promise<void>;
+  /** 一键：只含当前分支（回到默认） */
+  showOnlyCurrentGraphRef: () => Promise<void>;
   /** HEAD 移动记录（Reflog 面板，展开区块时懒加载） */
   reflog: ReflogEntry[];
   /** 正在进行 git bisect（决定横幅和提交头的标记按钮） */
@@ -495,7 +502,7 @@ const EMPTY_REPO_STATE = {
   graph: [] as GraphRow[],
   stashes: [] as StashEntry[],
   backups: [] as BackupEntry[],
-  excludedRefs: [] as string[],
+  graphPicked: null as GraphPicked,
   reflog: [] as ReflogEntry[],
   bisecting: false,
   bisectInfo: null as string | null,
@@ -582,36 +589,21 @@ export const useStore = create<AppStore>()((set, get) => {
     return repo.path;
   }
 
-  /**
-   * 按当前已知的 refs 裁剪排除列表：被删除的分支不能再作为 --not 参数，
-   * 否则 git log 直接报 unknown revision。
-   */
-  function prunedExcludes(repoPath: string): string[] {
-    const cur = get().excludedRefs;
-    if (cur.length === 0) return [];
-    const known = new Set(get().refs.map((r) => r.fullName));
-    const next = cur.filter((x) => known.has(x));
-    if (next.length !== cur.length) {
-      saveGraphExcludes(repoPath, next);
-      set({ excludedRefs: next });
-    }
-    return next;
-  }
-
   /** 带排除项取日志；排除项引用失效时清空重试一次（自愈） */
+  /** 取日志；失败就把过滤条件退回默认（只看当前分支）再试一次 */
   async function fetchLogSafe(
     repoPath: string,
     limit: number,
     scope: LogScope,
-    excludes: string[],
+    picked: GraphPicked,
   ): Promise<Commit[]> {
     try {
-      return await getLog(repoPath, limit, scope, excludes);
+      return await getLog(repoPath, limit, scope, picked);
     } catch (e) {
-      if (excludes.length === 0) throw e;
-      saveGraphExcludes(repoPath, []);
-      set({ excludedRefs: [] });
-      return getLog(repoPath, limit, scope, []);
+      if (picked === 'all') throw e;
+      saveGraphPicked(repoPath, null);
+      set({ graphPicked: null });
+      return getLog(repoPath, limit, scope, null);
     }
   }
 
@@ -863,7 +855,7 @@ export const useStore = create<AppStore>()((set, get) => {
           ...get().recent.filter((r) => r.path !== repo.path),
         ].slice(0, MAX_RECENT);
         saveRecent(recent);
-        set({ repo, recent, bottomPanel: 'none', excludedRefs: loadGraphExcludes(repo.path) });
+        set({ repo, recent, bottomPanel: 'none', graphPicked: loadGraphPicked(repo.path) });
         await startWatch(repo.path);
         await get().refresh();
         // 刚打开的仓库立刻读一次当前分支（左栏显示 name (branch)）
@@ -908,15 +900,31 @@ export const useStore = create<AppStore>()((set, get) => {
     },
 
     /** 勾/取消一个 ref 参与提交图；排除列表按仓库持久化，立即重拉日志 */
+    async showAllGraphRefs() {
+      const repo = get().repo;
+      if (!repo) return;
+      saveGraphPicked(repo.path, 'all');
+      set({ graphPicked: 'all' });
+      await get().refreshLog();
+    },
+
+    async showOnlyCurrentGraphRef() {
+      const repo = get().repo;
+      if (!repo) return;
+      saveGraphPicked(repo.path, null);
+      set({ graphPicked: null });
+      await get().refreshLog();
+    },
+
     async toggleGraphRef(fullName) {
       const repo = get().repo;
       if (!repo) return;
-      const cur = new Set(get().excludedRefs);
-      if (cur.has(fullName)) cur.delete(fullName);
-      else cur.add(fullName);
-      const list = [...cur];
-      saveGraphExcludes(repo.path, list);
-      set({ excludedRefs: list });
+      // 当前分支不允许被排除
+      if (fullName === currentRefOf(get().status?.branch.head ?? null)) return;
+      const allNames = get().refs.map((r) => r.fullName);
+      const next = togglePicked(get().graphPicked, fullName, allNames);
+      saveGraphPicked(repo.path, next);
+      set({ graphPicked: next });
       await get().refreshLog();
     },
 
@@ -943,14 +951,12 @@ export const useStore = create<AppStore>()((set, get) => {
       try {
         const search = get().logQuery;
         const searchActive = !!(search && search.text.trim());
-        // 搜索不受图过滤影响（找提交是全库找的）；只有常规日志按勾选裁剪
-        const excludes = searchActive ? [] : await prunedExcludes(repo.path);
-        const [status, commits, refs, stashes, backups, ongoing, remotes, stat, bisecting] =
+
+        // 先拿 status：排除列表要用「最新的当前分支」来裁剪，
+        // 否则切分支后会读到旧的 head，把新分支自己继续排除（历史空白）。
+        const [status, refs, stashes, backups, ongoing, remotes, stat, bisecting] =
           await Promise.all([
             getStatus(repo.path),
-            searchActive
-              ? searchLog(repo.path, get().logLimit, search, get().logScope)
-              : fetchLogSafe(repo.path, get().logLimit, get().logScope, excludes),
             getRefs(repo.path),
             listStashes(repo.path),
             listBackups(repo.path),
@@ -963,6 +969,11 @@ export const useStore = create<AppStore>()((set, get) => {
             }),
             isBisecting(repo.path),
           ]);
+        set({ status });
+        // 搜索不受图过滤影响（找提交是全库找的）；只有常规日志按勾选裁剪
+        const commits = searchActive
+          ? await searchLog(repo.path, get().logLimit, search, get().logScope, get().graphPicked)
+          : await fetchLogSafe(repo.path, get().logLimit, get().logScope, get().graphPicked);
         const statText = stat.stdout.trim();
         const statFiles = /(\d+) file/.exec(statText);
         const statIns = /(\d+) insertion/.exec(statText);
@@ -1044,16 +1055,19 @@ export const useStore = create<AppStore>()((set, get) => {
       if (isWriteInFlight()) return;
       set({ busy: '刷新…', error: null });
       try {
+        // 勾选框变化后走这里：先取最新 status，才能知道「当前分支」是谁
+        try {
+          const fresh = await getStatus(repo.path);
+          set({ status: fresh });
+        } catch {
+          /* 取不到就沿用旧值，总比不刷新好 */
+        }
         const search = get().logQuery;
+        const picked = get().graphPicked;
         const commits =
           search && search.text.trim()
-            ? await searchLog(repo.path, get().logLimit, search, get().logScope)
-            : await fetchLogSafe(
-                repo.path,
-                get().logLimit,
-                get().logScope,
-                prunedExcludes(repo.path),
-              );
+            ? await searchLog(repo.path, get().logLimit, search, get().logScope, picked)
+            : await fetchLogSafe(repo.path, get().logLimit, get().logScope, picked);
 
         const current = get().selectedSha;
         set({ commits, graph: layoutGraph(commits) });

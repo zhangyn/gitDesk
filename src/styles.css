@@ -3632,3 +3632,22 @@ body.is-resizing-x {
   margin: 0 6px;
   color: var(--muted);
 }
+
+/* 提交图的 ref 过滤快捷按钮 */
+.ref-bulk {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mini-text {
+  padding: 0 5px;
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.mini-text:hover {
+  background: var(--hover-2);
+  color: var(--fg);
+}

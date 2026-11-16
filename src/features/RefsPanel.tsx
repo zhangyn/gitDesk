@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
+import { currentRefOf as currentRef, isInGraph } from '../git/revFilter';
 import { promptBox } from '../ui/dialog';
 
 function Section({
@@ -94,13 +95,13 @@ export function RefsPanel() {
   const stashSaveOp = useStore((s) => s.stashSaveOp);
   const restoreBackupOp = useStore((s) => s.restoreBackupOp);
   const deleteRemoteBranchOp = useStore((s) => s.deleteRemoteBranchOp);
-  const excludedRefs = useStore((s) => s.excludedRefs);
+  const graphPicked = useStore((s) => s.graphPicked);
   const toggleGraphRef = useStore((s) => s.toggleGraphRef);
+  const showAllGraphRefs = useStore((s) => s.showAllGraphRefs);
+  const showOnlyCurrentGraphRef = useStore((s) => s.showOnlyCurrentGraphRef);
   const reflog = useStore((s) => s.reflog);
   const loadReflog = useStore((s) => s.loadReflog);
   const openCommit = useStore((s) => s.openCommit);
-
-  const excludedSet = useMemo(() => new Set(excludedRefs), [excludedRefs]);
 
   // 分支/远程/标签多时一个过滤框比逐组翻找快得多（SmartGit 的 speed search 思路）
   const [query, setQuery] = useState('');
@@ -112,6 +113,13 @@ export function RefsPanel() {
   const tags = refs.filter((r) => r.kind === 'tag' && match(r.name));
   const shownStashes = stashes.filter((s) => match(s.ref) || match(s.subject));
   const head = status?.branch.head ?? null;
+
+  // 勾选状态由 graphPicked 决定：默认（null）只含当前分支，其余一律不勾
+  const curRef = currentRef(head);
+  const inGraph = useCallback(
+    (fullName: string) => isInGraph(graphPicked, fullName, curRef),
+    [graphPicked, curRef],
+  );
 
   /** origin/feature-x → 删远端要拆成 remote=origin + branch=feature-x */
   const deleteRemoteRef = (name: string) => {
@@ -172,14 +180,30 @@ export function RefsPanel() {
         tip="勾选框控制该分支是否参与上方提交图：取消勾选后，这条分支独有的提交从图里消失、泳道收起；已合并进其他分支的提交仍会显示（通过别的分支仍可达）。用来在多分支仓库里收起不关心的开发线。当前分支始终显示。双击分支切换检出。"
         count={branches.length}
         action={
-          <button className="icon-btn" title="新建分支" onClick={() => void newBranch()}>
-            +
-          </button>
+          <span className="ref-bulk">
+            <button
+              className="mini-text"
+              title="所有分支都参与提交图"
+              onClick={() => void showAllGraphRefs()}
+            >
+              全部
+            </button>
+            <button
+              className="mini-text"
+              title="只让当前分支参与提交图（默认）"
+              onClick={() => void showOnlyCurrentGraphRef()}
+            >
+              当前
+            </button>
+            <button className="icon-btn" title="新建分支" onClick={() => void newBranch()}>
+              +
+            </button>
+          </span>
         }
       >
         {branches.map((b) => {
           const current = b.name === head;
-          const inGraph = current || !excludedSet.has(b.fullName);
+          const checked = inGraph(b.fullName);
           return (
             <div
               key={b.name}
@@ -189,14 +213,14 @@ export function RefsPanel() {
               <input
                 type="checkbox"
                 className="ref-check"
-                checked={inGraph}
+                checked={checked}
                 disabled={current}
                 title={
                   current
                     ? '当前分支始终参与提交图'
-                    : inGraph
+                    : checked
                       ? '参与提交图（取消勾选可收起这条开发线）'
-                      : '已从提交图排除（勾选恢复显示）'
+                      : '未参与提交图（勾选把它加进图里）'
                 }
                 onChange={() => void toggleGraphRef(b.fullName)}
               />
@@ -254,11 +278,11 @@ export function RefsPanel() {
             <input
               type="checkbox"
               className="ref-check"
-              checked={!excludedSet.has(r.fullName)}
+              checked={inGraph(r.fullName)}
               title={
-                excludedSet.has(r.fullName)
-                  ? '已从提交图排除（勾选恢复显示）'
-                  : '参与提交图（取消勾选可收起这条远程开发线）'
+                inGraph(r.fullName)
+                  ? '参与提交图（取消勾选可收起这条远程开发线）'
+                  : '未参与提交图（勾选把它加进图里）'
               }
               onChange={() => void toggleGraphRef(r.fullName)}
             />

@@ -2,6 +2,7 @@ import type { Commit, CommitFile } from '../../types';
 import { parseLog } from '../../parse/log';
 import { parseNameStatus } from '../nameStatus';
 import { runGit, runGitChecked } from '../runner';
+import { graphRevs, type GraphPicked } from '../revFilter';
 
 /** %x1f 分隔字段，%x1e 分隔记录 —— 与 parse/log.ts 一一对应 */
 const LOG_FORMAT =
@@ -31,12 +32,15 @@ export async function searchLog(
   limit: number,
   search: LogSearch,
   scope: LogScope = 'local',
+  picked: GraphPicked = 'all',
 ): Promise<Commit[]> {
   const q = search.text.trim();
-  if (!q) return getLog(repoPath, limit, scope);
+  if (!q) return getLog(repoPath, limit, scope, picked);
 
   const args = ['log', '--topo-order', '-n', String(limit), `--format=${LOG_FORMAT}`];
   // 版本范围必须放在 `--` 之前！放后面会被当成路径，搜索范围就退化成只有 HEAD
+  // 搜索是全库找的（不受提交图勾选影响），所以固定用 --all 语义
+  void picked;
   args.push('--branches', '--tags', 'HEAD');
   if (scope === 'all') args.push('--remotes');
   if (search.mode === 'message') {
@@ -54,13 +58,10 @@ export async function getLog(
   repoPath: string,
   limit = 400,
   scope: LogScope = 'local',
-  /** 不参与提交图的完整 refname 列表（refs/heads/x、refs/remotes/o/x），按 `--not` 排除 */
-  exclude: string[] = [],
+  /** 哪些分支参与提交图，见 revFilter.ts */
+  picked: GraphPicked = 'all',
 ): Promise<Commit[]> {
-  // --tags：只在标签上可达的提交也要出现在历史里
-  const refs = scope === 'all' ? ['--all'] : ['--branches', '--tags', 'HEAD'];
-  const args = ['log', ...refs];
-  if (exclude.length > 0) args.push('--not', ...exclude);
+  const args = ['log', ...graphRevs(picked, scope)];
   args.push('--topo-order', '-n', String(limit), `--format=${LOG_FORMAT}`);
   const res = await runGit(args, { cwd: repoPath, timeoutMs: 30_000 });
   if (res.code !== 0) {

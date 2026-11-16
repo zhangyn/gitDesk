@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { parseLog } from '../src/parse/log';
+import { currentRefOf, graphRevs, isInGraph, togglePicked } from '../src/git/revFilter';
 
 const BASE = ['-c', 'core.quotepath=false', '-c', 'color.ui=false'];
 const FORMAT =
@@ -299,6 +300,46 @@ try {
     tryGit(['rev-parse', '--verify', '--quiet', 'no-such-branch^{commit}']).code,
     1,
   );
+  /* -------------------------- 提交图 ref 过滤（默认只看当前分支） */
+  {
+    eq('默认：只用当前分支（不加 --branches）', graphRevs(null, 'local'), ['--tags', 'HEAD']);
+    eq('全部：本地分支', graphRevs('all', 'local'), ['--branches', '--tags', 'HEAD']);
+    eq('全部 + 含远程', graphRevs('all', 'all'), ['--all']);
+    eq('手动勾选：附加在 HEAD 之后', graphRevs(['refs/heads/bug-x'], 'local'), [
+      '--tags',
+      'HEAD',
+      'refs/heads/bug-x',
+    ]);
+
+    eq('勾选态：当前分支恒选', isInGraph(null, 'refs/heads/main', 'refs/heads/main'), true);
+    eq('勾选态：默认其它不勾', isInGraph(null, 'refs/heads/bug-x', 'refs/heads/main'), false);
+    eq('勾选态：全部时都勾', isInGraph('all', 'refs/heads/bug-x', 'refs/heads/main'), true);
+    eq(
+      '勾选态：显式列表',
+      isInGraph(['refs/heads/bug-x'], 'refs/heads/bug-x', 'refs/heads/main'),
+      true,
+    );
+
+    const all = ['refs/heads/main', 'refs/heads/bug-x', 'refs/remotes/o/dev'];
+    eq('切换：默认勾一个 → 显式列表', togglePicked(null, 'refs/heads/bug-x', all), [
+      'refs/heads/bug-x',
+    ]);
+    eq('切换：从全部取消一个 → 其余仍参与', togglePicked('all', 'refs/heads/bug-x', all), [
+      'refs/heads/main',
+      'refs/remotes/o/dev',
+    ]);
+    eq(
+      '切换：取消到空 → 回到默认',
+      togglePicked(['refs/heads/bug-x'], 'refs/heads/bug-x', all),
+      null,
+    );
+    eq('切换：再加一个', togglePicked(['refs/heads/bug-x'], 'refs/remotes/o/dev', all), [
+      'refs/heads/bug-x',
+      'refs/remotes/o/dev',
+    ]);
+    eq('currentRef 拼装', currentRefOf('bug-x'), 'refs/heads/bug-x');
+    eq('currentRef：detached', currentRefOf(null), null);
+  }
 } catch (e) {
   fail += 1;
   failures.push(`脚本异常：${e instanceof Error ? e.message : String(e)}`);
