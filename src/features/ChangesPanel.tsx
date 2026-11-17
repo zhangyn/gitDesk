@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { hasStaged, hasWorktree, useStore } from '../store';
+import { sortEntries } from '../git/fileSort';
 import { absPath } from '../git/ops/repo';
 import type { CommitFile, StatusEntry } from '../types';
 
@@ -223,12 +224,15 @@ export function ChangesPanel() {
 
   const [filter, setFilter] = useState('');
 
+  const fileSort = useStore((st) => st.fileSort);
+  const setFileSortMode = useStore((st) => st.setFileSortMode);
+
   const entries = useMemo(() => {
-    const all = status?.entries ?? [];
-    if (!filter.trim()) return all;
+    const sorted = sortEntries(status?.entries ?? [], fileSort);
+    if (!filter.trim()) return sorted;
     const q = filter.trim().toLowerCase();
-    return all.filter((e) => e.path.toLowerCase().includes(q));
-  }, [status, filter]);
+    return sorted.filter((e) => e.path.toLowerCase().includes(q));
+  }, [status, filter, fileSort]);
 
   const total = status?.entries.length ?? 0;
   const activeTab = commitTabs.find((t) => t.key === fileTab) ?? null;
@@ -359,6 +363,30 @@ export function ChangesPanel() {
                 已选 {pickedCount} 个
               </span>
             )}
+            <span className="sort-group" title="文件排序：再点当前项可切换升/降序">
+              {(
+                [
+                  ['name', '名称'],
+                  ['status', '状态'],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  className={`sort-btn${fileSort.mode === mode ? ' is-on' : ''}`}
+                  onClick={() => setFileSortMode(mode)}
+                  title={
+                    mode === 'name'
+                      ? '按文件名排序（再点切换升/降序）'
+                      : '按状态排序：冲突 → 已暂存 → 未暂存 → 未跟踪（再点切换）'
+                  }
+                >
+                  {label}
+                  {fileSort.mode === mode && (
+                    <span className="sort-arrow">{fileSort.dir === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </button>
+              ))}
+            </span>
             <span className="chips-legend" title="每行两个格子：左=暂存区状态，右=工作区状态">
               左 暂存区 · 右 工作区
             </span>

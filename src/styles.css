@@ -1454,7 +1454,8 @@ body.is-resizing {
   flex: 0 0 auto;
   border-top: 1px solid var(--border);
   background: var(--bg-panel);
-  max-height: 42vh;
+  /* 62 个分支也不会把菜单撑到天上去 */
+  max-height: 28vh;
 }
 
 .bp-head {
@@ -3797,4 +3798,42 @@ body.is-resizing-x {
   color: var(--muted);
   font-size: calc(var(--fs-base) * 0.786);
   line-height: 1.5;
+}
+
+/* 工作区文件排序：名称 / 状态 */
+.sort-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: calc(var(--fs-base) * 0.8214);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sort-btn:hover {
+  background: var(--hover-1);
+  color: var(--fg-dim);
+}
+
+.sort-btn.is-on {
+  border-color: var(--border);
+  background: var(--bg-raised);
+  color: var(--fg);
+}
+
+.sort-arrow {
+  color: var(--accent);
+  font-size: calc(var(--fs-base) * 0.7857);
 }

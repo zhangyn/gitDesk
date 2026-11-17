@@ -13,6 +13,8 @@ import { dirname, join } from 'node:path';
 
 import { parseLog } from '../src/parse/log';
 import { currentRefOf, graphRevs, isInGraph, togglePicked } from '../src/git/revFilter';
+import { normalizeSort, nextSort, sortEntries, statusRank } from '../src/git/fileSort';
+import type { StatusEntry } from '../src/types';
 import {
   APPEARANCE_DEFAULT,
   FONT_SIZE_MAX,
@@ -310,6 +312,62 @@ try {
     tryGit(['rev-parse', '--verify', '--quiet', 'no-such-branch^{commit}']).code,
     1,
   );
+  /* ------------------------------ 工作区文件排序 */
+  {
+    const e = (path: string, kind: StatusEntry['kind'], index: string, worktree: string) =>
+      ({ path, kind, index, worktree }) as StatusEntry;
+    const list: StatusEntry[] = [
+      e('src/b.ts', 'tracked', '.', 'M'), // 未暂存
+      e('a.txt', 'untracked', '?', '?'), // 未跟踪
+      e('conflict.txt', 'unmerged', 'U', 'U'), // 冲突
+      e('c.ts', 'tracked', 'M', '.'), // 已暂存
+      e('A.ts', 'tracked', 'M', 'M'), // 已暂存 + 未暂存
+      e('doc.md', 'tracked', '.', 'D'), // 未暂存
+    ];
+
+    eq(
+      '排序：状态分组 冲突<已暂存<未暂存<未跟踪',
+      [statusRank(list[2]), statusRank(list[3]), statusRank(list[0]), statusRank(list[1])],
+      [0, 1, 2, 3],
+    );
+
+    eq(
+      '排序：按名称升序',
+      sortEntries(list, { mode: 'name', dir: 'asc' }).map((x) => x.path),
+      ['A.ts', 'a.txt', 'c.ts', 'conflict.txt', 'doc.md', 'src/b.ts'],
+    );
+    eq(
+      '排序：按名称降序',
+      sortEntries(list, { mode: 'name', dir: 'desc' }).map((x) => x.path),
+      ['src/b.ts', 'doc.md', 'conflict.txt', 'c.ts', 'a.txt', 'A.ts'],
+    );
+    eq(
+      '排序：按状态升序（冲突/已暂存/未暂存/未跟踪）',
+      sortEntries(list, { mode: 'status', dir: 'asc' }).map((x) => x.path),
+      ['conflict.txt', 'A.ts', 'c.ts', 'doc.md', 'src/b.ts', 'a.txt'],
+    );
+    eq(
+      '排序：按状态降序（未跟踪在最前）',
+      sortEntries(list, { mode: 'status', dir: 'desc' }).map((x) => x.path),
+      ['a.txt', 'doc.md', 'src/b.ts', 'A.ts', 'c.ts', 'conflict.txt'],
+    );
+    eq('排序：不改动传入数组', list.map((x) => x.path)[0], 'src/b.ts');
+    eq('排序：空列表', sortEntries([], { mode: 'status', dir: 'asc' }).length, 0);
+
+    eq('排序切换：点当前模式翻转方向', nextSort({ mode: 'name', dir: 'asc' }, 'name'), {
+      mode: 'name',
+      dir: 'desc',
+    });
+    eq('排序切换：换个模式回到升序', nextSort({ mode: 'name', dir: 'desc' }, 'status'), {
+      mode: 'status',
+      dir: 'asc',
+    });
+    eq('排序：非法持久化值回落默认', normalizeSort({ mode: 'xx', dir: 'yy' }), {
+      mode: 'status',
+      dir: 'asc',
+    });
+  }
+
   /* ------------------------------ 外观设置（字号 / 行距） */
   {
     eq('外观：默认 14px + 18px 间距 = 32px 行高', rowHeightOf(APPEARANCE_DEFAULT), 32);

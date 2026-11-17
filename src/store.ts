@@ -128,6 +128,15 @@ import {
   undecidedCount,
   type Decision,
 } from './conflict/parse';
+import {
+  FILE_SORT_DEFAULT,
+  loadFileSort,
+  nextSort,
+  normalizeSort,
+  saveFileSort,
+  type FileSort,
+  type FileSortMode,
+} from './git/fileSort';
 import { layoutGraph, type GraphRow } from './features/graph/layout';
 import { buildSelectedPatch } from './patch/build';
 import { confirmBox } from './ui/dialog';
@@ -352,6 +361,9 @@ interface AppStore {
   pickFile: (path: string, mode: 'single' | 'toggle' | 'range', order?: string[]) => void;
   /** 全选当前文件列表（Ctrl+A；输入框内不抢） */
   selectAllFiles: () => void;
+  /** 工作区文件列表排序：名称 / 状态 */
+  fileSort: FileSort;
+  setFileSortMode: (mode: FileSortMode) => void;
   clearPicked: () => void;
   /** 外观设置：字号 / 行距 */
   appearance: Appearance;
@@ -532,6 +544,7 @@ const EMPTY_REPO_STATE = {
   logLimit: LOG_PAGE,
   pickedPaths: [] as string[],
   appearance: loadAppearance(),
+  fileSort: loadFileSort(),
   settingsOpen: false,
   fileAnchor: null,
   wordDiff: localStorage.getItem('gitdesk.wordDiff') !== '0',
@@ -1182,6 +1195,12 @@ export const useStore = create<AppStore>()((set, get) => {
 
     clearPicked() {
       set({ pickedPaths: [], fileAnchor: null });
+    },
+
+    setFileSortMode(mode) {
+      const next = nextSort(get().fileSort ?? FILE_SORT_DEFAULT, mode);
+      saveFileSort(next);
+      set({ fileSort: normalizeSort(next) });
     },
 
     setAppearance(patch) {
