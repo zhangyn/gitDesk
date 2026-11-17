@@ -12,6 +12,7 @@ import {
   IconSun,
   IconChevron,
   IconCommit,
+  IconCompare,
   IconFolder,
   IconLog,
   IconMerge,
@@ -308,6 +309,14 @@ export function Toolbar() {
         <BranchPicker exclude={branch} onPick={(n) => void rebaseOntoOp(n)} />
       </Popover>
 
+      <TB
+        icon={IconCompare}
+        label="对比"
+        onClick={() => setCompareOpen(true)}
+        disabled={disabled || noRepo}
+        title="对比两个版本（任意两个提交/分支之间）"
+      />
+
       <span className="tb-sep" />
 
       <Popover
@@ -345,7 +354,6 @@ export function Toolbar() {
 
       <Popover width={260} trigger={<TB label="更多" caret disabled={noRepo} />}>
         <MenuItem onClick={() => void newTag()}>新建标签…</MenuItem>
-        <MenuItem onClick={() => setCompareOpen(true)}>对比两个版本…</MenuItem>
         <MenuSep />
         <div className="menu-title">提交历史范围</div>
         <MenuItem
